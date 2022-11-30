@@ -4030,6 +4030,15 @@ Cf. PolarCoordinateSystem.</rdfs:comment>
     
 
 
+    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeBeans -->
+
+    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeBeans">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Granular"/>
+    </owl:Class>
+    
+
+
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeHouse-Organization -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeHouse-Organization">
@@ -4905,6 +4914,14 @@ The two most common types of coordinate systems are CartesianCoordinateSystems a
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#Drink">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#FoodOrDrink"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#LiquidTangibleThing"/>
+    </owl:Class>
+    
+
+
+    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient -->
+
+    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#FoodOrDrinkOrIngredient"/>
     </owl:Class>
     
 
@@ -9069,8 +9086,17 @@ Note that a fictional or imaginary object (such as Frodo, Captain Queeg, or HAL9
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#Sugar -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#Sugar">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Food"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Granular"/>
+    </owl:Class>
+    
+
+
+    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#SugarCube -->
+
+    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#SugarCube">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
     </owl:Class>
     
 
@@ -9310,6 +9336,14 @@ Cf. Surface, whose instances are two-dimensional, intangible regions of space.</
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#Tea-Iced">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Tea-Beverage"/>
+    </owl:Class>
+    
+
+
+    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#TeaPacket -->
+
+    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#TeaPacket">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
     </owl:Class>
     
 
@@ -9907,6 +9941,7 @@ Cf. Surface, whose instances are two-dimensional, intangible regions of space.</
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#Water">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#ColorlessThing"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Drink"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#EnduringThing-Localized"/>
     </owl:Class>
     
