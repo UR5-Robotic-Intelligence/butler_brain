@@ -37,9 +37,8 @@ if __name__ == "__main__":
     # output_of_gpt3 = "1.cup\n2.coffee"
     # output_of_gpt3 = "1.cup\n2.tea"
     output_of_gpt3 = input("Enter the output of GPT-3: ")
-    output_components = output_of_gpt3.split("\n")
+    output_components = output_of_gpt3.split("\\n")
     output_components = [x.split(".")[-1] for x in output_components]
-    
     # Find the activity that outputs the components, and the name of the components in the ontology.
     # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
     # For example, GPT-3 may output "coffee", but the name of the coffee in the ontology is "Coffee-Beverage".
@@ -56,8 +55,9 @@ if __name__ == "__main__":
         if (component in C.lower()) or (component in B.lower()):
           activities[B] = {"output": C}
           # print("Found solution. A = {}, B = {}, C = {}".format(A, B, C))
+          break
     query.finish()
-    
+
     # Find if it is a Drink or a Food
     for act in activities.values():
       for val in ['Drink', 'Food']:
