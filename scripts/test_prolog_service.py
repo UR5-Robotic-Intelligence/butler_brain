@@ -24,8 +24,8 @@ if __name__ == "__main__":
     # we first find all the activities that create a final product.
     # then we search for the activity that outputs an object that has the word "coffee" in its name.
     event_that_has_outputs_created = "is_restriction(A, some(" + ns + "outputsCreated\", C)), subclass_of(B, A), subclass_of(C, Sc)"
-    that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\")" # , \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
-    has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)"
+    that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\")" 
+    has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
     is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
     
     query_string = event_that_has_outputs_created + ", " + that_are_subclass_of_food_or_drink + \
@@ -43,7 +43,7 @@ if __name__ == "__main__":
       # print("B: {}, C: {}, E: {}".format(B, C, E))
       Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
       for component in output_components:
-        if (component.lower() in B.lower()) or (component.lower() in C.lower()):
+        if (component.lower() in B.lower()) or (component.lower() in C.lower()) or (component.lower() in Sc.lower()) or (component.lower() in Sb.lower()):
           if B not in activities:
             activities[B] = {'output':C, 'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1}
           else:
@@ -53,37 +53,43 @@ if __name__ == "__main__":
               activities[B]['components'].append(component)
               activities[B]['votes'] += 1
           # print("Found activity {} that outputs {} and acts on {}".format(B, C, E))
-        if component.lower() in Sb.lower():
-          if Sb not in super_activities:
-            super_activities[Sb] = {'level': 'superActivity', 'components':[component], 'votes':1}
-          elif component not in super_activities[Sb]['components']:
-            super_activities[Sb]['components'].append(component)
-            super_activities[Sb]['votes'] += 1
-        if component.lower() in Sc.lower():
-          if Sc not in super_objects:
-            super_objects[Sc] = {'level': 'superObject', 'components':[component], 'votes':1}
-          elif component not in super_objects[Sc]['components']:
-            super_objects[Sc]['components'].append(component)
-            super_objects[Sc]['votes'] += 1
-          
-        
+
     query.finish()
-      
+
     activities_list = sorted([(key, val) for key, val in activities.items()], key=lambda x: x[1]['votes'], reverse=True)
     super_activities_list = sorted([(key, val) for key, val in super_activities.items()], key=lambda x: x[1]['votes'], reverse=True)
     super_objects_list = sorted([(key, val) for key, val in super_objects.items()], key=lambda x: x[1]['votes'], reverse=True)
     sorted_candidates = activities_list + super_activities_list + super_objects_list
     if len(sorted_candidates) < 1:
       print("No activities or Food or Drink found to match your request")
+      exit()
     print("Cadidates are: ", sorted_candidates)
     
+
+    if len(sorted_candidates) > 1:
+      if sorted_candidates[0][1]['votes'] == sorted_candidates[1][1]['votes']:
+        print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
+        for i, candidate in enumerate(sorted_candidates):
+          print("{}. {}".format(i+1, candidate[0]))
+        choice = int(input("Enter your choice: "))
+        if choice == 1:
+          sorted_candidates = sorted_candidates[:1]
+        elif choice == 2:
+          sorted_candidates = sorted_candidates[1:]
+        else:
+          print("Invalid choice. Please try again.")
+          exit()
+      else:
+        sorted_candidates = sorted_candidates[:1]
+    
     chosen_activity = {sorted_candidates[0][0]: sorted_candidates[0][1]}
+    
     # Find if it is a Drink or a Food
     for act in chosen_activity.values():
       found = False
       for val in ['Drink', 'Food']:
         objects = list(act['objectActedOn'])
-        if 'output' in act:
+        if 'output' in act.keys():
           objects.append(act['output'])
         for obj in objects:
           query = prolog.query("subclass_of(" + ns + obj + "\", " + ns + val + "\").")
@@ -99,7 +105,7 @@ if __name__ == "__main__":
     
     # Perform the activities
     filtered_objects = []
-    for act, val in activities.items():
+    for act, val in chosen_activity.items():
       for obj in val['objectActedOn']:
         t = "Drinking" if val['type'] == "Drink" else val['type']
         query_string = "subclass_of(" + ns + obj + "\", " + ns + t + "Ingredient" + "\")"
@@ -115,4 +121,3 @@ if __name__ == "__main__":
         prepareAMeal(val['output'])
       else:
         bringObject(val['output'])
-    print(activities)
