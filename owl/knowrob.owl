@@ -4033,7 +4033,7 @@ Cf. PolarCoordinateSystem.</rdfs:comment>
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeBeans -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeBeans">
-        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Granular"/>
     </owl:Class>
     
@@ -4918,14 +4918,6 @@ The two most common types of coordinate systems are CartesianCoordinateSystems a
     
 
 
-    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient -->
-
-    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient">
-        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#FoodOrDrinkOrIngredient"/>
-    </owl:Class>
-    
-
-
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingBottle -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingBottle">
@@ -4954,6 +4946,14 @@ The two most common types of coordinate systems are CartesianCoordinateSystems a
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingGlass">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingVessel"/>
+    </owl:Class>
+    
+
+
+    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient -->
+
+    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#FoodOrDrinkOrIngredient"/>
     </owl:Class>
     
 
@@ -6412,10 +6412,36 @@ Note that some events, such as an ice cube melting into a small puddle of water,
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#PreparingABeverage"/>
         <rdfs:subClassOf>
             <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#CoffeeBeans"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingMug"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Water"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
                 <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#outputsCreated"/>
                 <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Coffee-Beverage"/>
             </owl:Restriction>
         </rdfs:subClassOf>
+    </owl:Class>
+    
+
+
+    <!-- http://ias.cs.tum.edu/kb/knowrob.owl#MakingJuice -->
+
+    <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#MakingJuice">
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#PreparingABeverage"/>
     </owl:Class>
     
 
@@ -7759,6 +7785,18 @@ Examples include the location of the center of mass of the Milky Way galaxy at t
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#PreparingABeverage">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#PreparingFoodOrDrink"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingVessel"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
     </owl:Class>
     
 
@@ -9086,7 +9124,7 @@ Note that a fictional or imaginary object (such as Frodo, Captain Queeg, or HAL9
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#Sugar -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#Sugar">
-        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Food"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Granular"/>
     </owl:Class>
@@ -9096,7 +9134,7 @@ Note that a fictional or imaginary object (such as Frodo, Captain Queeg, or HAL9
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#SugarCube -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#SugarCube">
-        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient"/>
     </owl:Class>
     
 
@@ -9343,7 +9381,7 @@ Cf. Surface, whose instances are two-dimensional, intangible regions of space.</
     <!-- http://ias.cs.tum.edu/kb/knowrob.owl#TeaPacket -->
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#TeaPacket">
-        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient"/>
     </owl:Class>
     
 
@@ -9941,7 +9979,7 @@ Cf. Surface, whose instances are two-dimensional, intangible regions of space.</
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#Water">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#ColorlessThing"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Drink"/>
-        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkIngredient"/>
+        <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingIngredient"/>
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#EnduringThing-Localized"/>
     </owl:Class>
     
