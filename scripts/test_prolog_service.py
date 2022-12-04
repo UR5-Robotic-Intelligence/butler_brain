@@ -44,14 +44,32 @@ if __name__ == "__main__":
       Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
       for component in output_components:
         if (component.lower() in B.lower()) or (component.lower() in C.lower()) or (component.lower() in Sc.lower()) or (component.lower() in Sb.lower()):
-          if B not in activities:
-            activities[B] = {'output':C, 'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1}
+          if B not in activities.keys():
+            activities[B] = {'output':C, 'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1, 'super_activities':[Sb], 'super_objects':[Sc]}
           else:
             if E not in activities[B]['objectActedOn']:
               activities[B]['objectActedOn'].append(E)
             if component not in activities[B]['components']:
               activities[B]['components'].append(component)
               activities[B]['votes'] += 1
+            if Sb not in activities[B]['super_activities']:
+              activities[B]['super_activities'].append(Sb)
+            if Sc not in activities[B]['super_objects']:
+              activities[B]['super_objects'].append(Sc)
+        if component.lower() in Sb.lower():
+          if Sb not in super_activities.keys():
+            super_activities[Sb] = {
+                'level': 'superActivity', 'components': [component], 'votes': 1}
+          elif component not in super_activities[Sb]['components']:
+            super_activities[Sb]['components'].append(component)
+            super_activities[Sb]['votes'] += 1
+        if component.lower() in Sc.lower():
+          if Sc not in super_objects.keys():
+            super_objects[Sc] = {'level': 'superObject',
+                                 'components': [component], 'votes': 1}
+          elif component not in super_objects[Sc]['components']:
+            super_objects[Sc]['components'].append(component)
+            super_objects[Sc]['votes'] += 1
           # print("Found activity {} that outputs {} and acts on {}".format(B, C, E))
 
     query.finish()
@@ -65,22 +83,26 @@ if __name__ == "__main__":
       exit()
     print("Cadidates are: ", sorted_candidates)
     
+    # Keep only the activities that have the highest number of votes.
+    highest_vote = -1
+    for key, val in sorted_candidates:
+      if val['votes'] > highest_vote:
+        highest_vote = val['votes']
+        best_candidate = key
+    sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
 
     if len(sorted_candidates) > 1:
-      if sorted_candidates[0][1]['votes'] == sorted_candidates[1][1]['votes']:
-        print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
-        for i, candidate in enumerate(sorted_candidates):
-          print("{}. {}".format(i+1, candidate[0]))
-        choice = int(input("Enter your choice: "))
-        if choice == 1:
-          sorted_candidates = sorted_candidates[:1]
-        elif choice == 2:
-          sorted_candidates = sorted_candidates[1:]
-        else:
-          print("Invalid choice. Please try again.")
-          exit()
-      else:
+      print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
+      for i, candidate in enumerate(sorted_candidates):
+        print("{}. {}".format(i+1, candidate[0]))
+      choice = int(input("Enter your choice: "))
+      if choice == 1:
         sorted_candidates = sorted_candidates[:1]
+      elif choice == 2:
+        sorted_candidates = sorted_candidates[1:]
+      else:
+        print("Invalid choice. Please try again.")
+        exit()
     
     chosen_activity = {sorted_candidates[0][0]: sorted_candidates[0][1]}
     
