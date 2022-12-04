@@ -1,7 +1,8 @@
 from owl_test.robot_action_primitives import FindObject, PickObject, PlaceObject
+from owl_test.utils import text_to_speech
 
-def prepareADrink(drink_name):
-  print("Preparing a drink named {}".format(drink_name))
+def prepareADrink(drink_name, verbose=True):
+  text_to_speech("Preparing a drink named {}".format(drink_name), verbose=verbose)
   # get components of the drink
   # if it is a hot drink, press the button on the kettle.
   # do I see a cup?
@@ -17,12 +18,13 @@ def prepareADrink(drink_name):
   pass
 
 
-def prepareAMeal(meal_name):
-  print("Preparing a meal named {}".format(meal_name))
+def prepareAMeal(meal_name, verbose=True):
+  text_to_speech("Preparing a meal named {}".format(meal_name),verbose=verbose)
   pass
 
 
-def bringObject(object_name):
+def bringObject(object_name, verbose=True):
+  text_to_speech("Bringing an object named {}".format(object_name), verbose=verbose)
   FindObject(object_name)
   PickObject(object_name)
   PlaceObject(object_name)
