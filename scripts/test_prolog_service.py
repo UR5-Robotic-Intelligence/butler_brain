@@ -4,12 +4,16 @@ import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
 import fuzzywuzzy.fuzz as fuzz
+import argparse
 
 if __name__ == "__main__":
     rospy.init_node('test_rosprolog')
     prolog = Prolog()
     ns = "\"http://ias.cs.tum.edu/kb/knowrob.owl#"
-
+    args = argparse.ArgumentParser(description='Test the rosprolog service')
+    args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
+    verbose = args.parse_args().verbose
+    
     # parse the output of GPT-3
     # output_of_gpt3 = "1.cup\n2.coffee"
     # output_of_gpt3 = "1.cup\n2.tea"
@@ -81,7 +85,9 @@ if __name__ == "__main__":
     if len(sorted_candidates) < 1:
       print("No activities or Food or Drink found to match your request")
       exit()
-    print("Cadidates are: ", sorted_candidates)
+    
+    if verbose:
+      print("Cadidates are: ", [(name, v['level']) for name, v in sorted_candidates])
     
     # Keep only the activities that have the highest number of votes.
     highest_vote = -1
@@ -104,15 +110,32 @@ if __name__ == "__main__":
     #        so we need to ask the user to define the new class "cold drink" and then we can use it.        # 
     #########################################################################################################
     
+    # remove all lower level candidates
     if len(filtered_sorted_candidates) > 1:
+      if verbose:
+        print("More than one candidate with the same number of votes, removing lower level candidates")
+      super_class_exists = False
+      for key2, val2 in filtered_sorted_candidates:
+          if val2['level'] in ['superActivity', 'superObject']:
+            super_class_exists = True
+            break
+      if super_class_exists:
+        filtered_sorted_candidates = list(filter(lambda x: x[1]['level'] in ['superActivity', 'superObject'], filtered_sorted_candidates))
+    
+    # score the candidates based on the similarity between the components of the candidate and the candidate name.
+    if len(filtered_sorted_candidates) > 1:
+      if verbose:
+        print("More than one candidate with the same number of votes, scoring candidates based on the similarity between the components of the candidate and the candidate name")
       for key, val in filtered_sorted_candidates:
         for comp in val['components']:
           if 'score' not in val.keys():
             val['score'] = 0
           val['score'] += fuzz.ratio(comp, key)
       filtered_sorted_candidates = sorted(filtered_sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
-    
-      print(filtered_sorted_candidates)
+
+      if verbose:
+        print("Scored cadidates are: ")
+        print([(candidate_name, v['score']) for candidate_name, v in filtered_sorted_candidates])
 
       highest_score = -1
       for key, val in filtered_sorted_candidates:
@@ -121,6 +144,9 @@ if __name__ == "__main__":
           best_candidate = key
       filtered_sorted_candidates = list(
           filter(lambda x: x[1]['score'] == highest_score, filtered_sorted_candidates))
+    
+    if verbose:
+      print("After filtering, cadidates are: ", [(name, v['level']) for name, v in filtered_sorted_candidates])
     
     if len(filtered_sorted_candidates) > 1:
       print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
@@ -135,7 +161,8 @@ if __name__ == "__main__":
         print("Invalid choice. Please try again.")
         exit()
     
-    print(filtered_sorted_candidates)
+    if verbose:
+      print("Final candidates are: ", filtered_sorted_candidates)
     
     chosen_activity = filtered_sorted_candidates[0][1]
     chosen_activity["name"] = filtered_sorted_candidates[0][0]
