@@ -89,47 +89,67 @@ if __name__ == "__main__":
       if val['votes'] > highest_vote:
         highest_vote = val['votes']
         best_candidate = key
-    sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
+    filtered_sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
 
-    if len(sorted_candidates) > 1:
-      for key, val in sorted_candidates:
+    if len(filtered_sorted_candidates) > 1:
+      for key, val in filtered_sorted_candidates:
         for comp in val['components']:
           if 'score' not in val.keys():
             val['score'] = 0
           val['score'] += fuzz.ratio(comp, key)
-      sorted_candidates = sorted(sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
+      filtered_sorted_candidates = sorted(filtered_sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
     
-      print(sorted_candidates)
+      print(filtered_sorted_candidates)
 
       highest_score = -1
-      for key, val in sorted_candidates:
+      for key, val in filtered_sorted_candidates:
         if val['score'] > highest_score:
           highest_score = val['score']
           best_candidate = key
-      sorted_candidates = list(
-          filter(lambda x: x[1]['score'] == highest_score, sorted_candidates))
+      filtered_sorted_candidates = list(
+          filter(lambda x: x[1]['score'] == highest_score, filtered_sorted_candidates))
     
-    if len(sorted_candidates) > 1:
+    if len(filtered_sorted_candidates) > 1:
       print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
-      for i, candidate in enumerate(sorted_candidates):
+      for i, candidate in enumerate(filtered_sorted_candidates):
         print("{}. {}".format(i+1, candidate[0]))
       choice = int(input("Enter your choice: "))
       if choice == 1:
-        sorted_candidates = sorted_candidates[:1]
+        filtered_sorted_candidates = filtered_sorted_candidates[:1]
       elif choice == 2:
-        sorted_candidates = sorted_candidates[1:]
+        filtered_sorted_candidates = filtered_sorted_candidates[1:]
       else:
         print("Invalid choice. Please try again.")
         exit()
     
-    print(sorted_candidates)
+    print(filtered_sorted_candidates)
     
-    chosen_activity = sorted_candidates[0][1]
-    chosen_activity["name"] = sorted_candidates[0][0]
+    chosen_activity = filtered_sorted_candidates[0][1]
+    chosen_activity["name"] = filtered_sorted_candidates[0][0]
     
     if chosen_activity['level'] == 'superObject':
       print("Please specify what type of {} you want me to prepare".format(chosen_activity['name']))
       exit()
+    
+    if chosen_activity['level'] == 'superActivity':
+      print("Please specify what type of {} you want me to prepare".format(chosen_activity['components'][0]))
+      print("I can prepare the following types of {}:".format(
+          chosen_activity['components'][0]))
+      query_string = "subclass_of(A, " + ns + chosen_activity['name'] + "\")."
+      query = prolog.query(query_string)
+      possible_activities = []
+      for solution in query.solutions():
+        possible_activities.append(solution['A'].split('#')[-1])
+      for i, candidate in enumerate(possible_activities):
+        print("{}. {}".format(i+1, candidate))
+      choice = int(input("Enter your choice: "))
+      chosen_activity['name'] = possible_activities[choice-1]
+      sorted_candidates_dict = dict(sorted_candidates)
+      if chosen_activity['name'] in sorted_candidates_dict.keys():
+        chosen_activity = sorted_candidates_dict[chosen_activity['name']]
+      else:
+        print("Will search for the activity in the ontology")
+        exit()
       
     
     # Find if it is a Drink or a Food
