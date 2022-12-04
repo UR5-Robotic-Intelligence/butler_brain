@@ -3,7 +3,7 @@
 import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
-from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text
+from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate
 import fuzzywuzzy.fuzz as fuzz
 import argparse
 import os
@@ -195,6 +195,8 @@ if __name__ == "__main__":
       possible_activities.append(solution['A'].split('#')[-1])
     for i, candidate in enumerate(possible_activities):
       text_to_speech("{}. {}".format(i+1, candidate), verbose=True)
+    # choice = get_top_matching_candidate(possible_activities, choice_text)
+    # choice_text = speach_to_text(verbose=verbose)
     choice = int(input(text_to_speech("Enter your choice: ", verbose=True)))
     chosen_activity['name'] = possible_activities[choice-1]
     sorted_candidates_dict = dict(sorted_candidates)

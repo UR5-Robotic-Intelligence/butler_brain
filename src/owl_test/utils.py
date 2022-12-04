@@ -3,7 +3,7 @@ from gtts import gTTS
 import openai
 import speech_recognition as sr
 import pyttsx3
-
+import fuzzywuzzy.fuzz as fuzz
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 google_api_key = os.environ.get("GOOGLE_API_KEY")
@@ -41,16 +41,6 @@ def speach_to_text(verbose=True):
   # Initialize the recognizer
   r = sr.Recognizer()
   
-  # Function to convert text to
-  # speech
-  # def SpeakText(command):
-      
-  #     # Initialize the engine
-  #     engine = pyttsx3.init()
-  #     engine.say(command)
-  #     engine.runAndWait()
-  # Loop infinitely for user to
-  # speak
   while(1):   
     # Exception handling to handle
     # exceptions at the runtime
@@ -103,6 +93,16 @@ def text_to_keywords(text, verbose=False):
   if verbose:
     print(response)
   return response["choices"][0]["text"]
+
+def get_top_matching_candidate(candidate_list, match_string):
+  top_ratio = 0
+  top_candidate_index = 0
+  for i, candidate in enumerate(candidate_list):
+      ratio = fuzz.partial_ratio(candidate, match_string)
+      if ratio > top_ratio:
+          top_ratio = ratio
+          top_candidate_index = i
+  return top_candidate_index
 
 
 if __name__ == '__main__':
