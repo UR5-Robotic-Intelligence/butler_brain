@@ -3,10 +3,9 @@
 import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
-from owl_test.utils import text_to_speech
+from owl_test.utils import text_to_speech, text_to_keywords
 import fuzzywuzzy.fuzz as fuzz
 import argparse
-import openai
 import os
 
 
@@ -18,15 +17,21 @@ if __name__ == "__main__":
   args = argparse.ArgumentParser(description='Test the rosprolog service')
   args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
   verbose = args.parse_args().verbose
-  openai.api_key = os.getenv("OPENAI_API_KEY")
   
   # parse the output of GPT-3
   # output_of_gpt3 = "1.cup\n2.coffee"
   # output_of_gpt3 = "1.cup\n2.tea"
-  output_of_gpt3 = input("Enter the output of GPT-3: ")
-  output_components = output_of_gpt3.split("\\n")
-  output_components = [x.split(".")[-1] for x in output_components]
-  
+  # output_of_gpt3 = input("Enter the output of GPT-3: ")
+  user_request = input("Enter your request: ")
+  output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
+  if verbose:
+    print(output_of_gpt3)
+  output_components = output_of_gpt3.strip().split("\n")
+  if verbose:
+    print(output_components)
+  output_components = [x.split(".")[-1].strip() for x in output_components]
+  if verbose:
+    print(output_components)
   # Find the activity that outputs the components, and the name of the components in the ontology.
   # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
   # For example, GPT-3 may output "coffee", but the name of the coffee in the ontology is "Coffee-Beverage".
