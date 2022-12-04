@@ -3,7 +3,7 @@
 import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
-from owl_test.utils import text_to_speech, text_to_keywords
+from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text
 import fuzzywuzzy.fuzz as fuzz
 import argparse
 import os
@@ -22,7 +22,8 @@ if __name__ == "__main__":
   # output_of_gpt3 = "1.cup\n2.coffee"
   # output_of_gpt3 = "1.cup\n2.tea"
   # output_of_gpt3 = input("Enter the output of GPT-3: ")
-  user_request = input("Enter your request: ")
+  # user_request = input("Enter your request: ")
+  user_request = speach_to_text(verbose=verbose)
   output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
   if verbose:
     print(output_of_gpt3)
@@ -32,6 +33,7 @@ if __name__ == "__main__":
   output_components = [x.split(".")[-1].strip() for x in output_components]
   if verbose:
     print(output_components)
+    
   # Find the activity that outputs the components, and the name of the components in the ontology.
   # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
   # For example, GPT-3 may output "coffee", but the name of the coffee in the ontology is "Coffee-Beverage".
