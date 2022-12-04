@@ -124,42 +124,46 @@ if __name__ == "__main__":
     
     print(sorted_candidates)
     
-    chosen_activity = {sorted_candidates[0][0]: sorted_candidates[0][1]}
+    chosen_activity = sorted_candidates[0][1]
+    chosen_activity["name"] = sorted_candidates[0][0]
+    
+    if chosen_activity['level'] == 'superObject':
+      print("Please specify what type of {} you want me to prepare".format(chosen_activity['name']))
+      exit()
+      
     
     # Find if it is a Drink or a Food
-    for act in chosen_activity.values():
-      found = False
-      for val in ['Drink', 'Food']:
-        objects = list(act['objectActedOn'])
-        if 'output' in act.keys():
-          objects.append(act['output'])
-        for obj in objects:
-          query = prolog.query("subclass_of(" + ns + obj + "\", " + ns + val + "\").")
-          for solution in query.solutions():
-            act['type'] = val
-            found = True
-            break
-          query.finish()
-          if found:
-            break
+    found = False
+    for val in ['Drink', 'Food']:
+      objects = list(chosen_activity['objectActedOn'])
+      if 'output' in chosen_activity.keys():
+        objects.append(chosen_activity['output'])
+      for obj in objects:
+        query = prolog.query("subclass_of(" + ns + obj + "\", " + ns + val + "\").")
+        for solution in query.solutions():
+          chosen_activity['type'] = val
+          found = True
+          break
+        query.finish()
         if found:
           break
+      if found:
+        break
     
     # Perform the activities
     filtered_objects = []
-    for act, val in chosen_activity.items():
-      for obj in val['objectActedOn']:
-        t = "Drinking" if val['type'] == "Drink" else val['type']
-        query_string = "subclass_of(" + ns + obj + "\", " + ns + t + "Ingredient" + "\")"
-        query_string += "; subclass_of(" + ns + obj + "\", " + ns + t + "Vessel" + "\")."
-        query = prolog.query(query_string)
-        for solution in query.solutions():
-          filtered_objects.append(obj)
-        query.finish()
-      val['objectActedOn'] = filtered_objects
-      if val['type'] == 'Drink':
-        prepareADrink(val['output'])
-      elif val['type'] == 'Food':
-        prepareAMeal(val['output'])
-      else:
-        bringObject(val['output'])
+    for obj in chosen_activity['objectActedOn']:
+      t = "Drinking" if chosen_activity['type'] == "Drink" else chosen_activity['type']
+      query_string = "subclass_of(" + ns + obj + "\", " + ns + t + "Ingredient" + "\")"
+      query_string += "; subclass_of(" + ns + obj + "\", " + ns + t + "Vessel" + "\")."
+      query = prolog.query(query_string)
+      for solution in query.solutions():
+        filtered_objects.append(obj)
+      query.finish()
+    chosen_activity['objectActedOn'] = filtered_objects
+    if chosen_activity['type'] == 'Drink':
+      prepareADrink(chosen_activity['output'])
+    elif chosen_activity['type'] == 'Food':
+      prepareAMeal(chosen_activity['output'])
+    else:
+      bringObject(chosen_activity['output'])

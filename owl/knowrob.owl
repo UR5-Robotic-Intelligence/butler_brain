@@ -6442,6 +6442,18 @@ Note that some events, such as an ice cube melting into a small puddle of water,
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#MakingJuice">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#PreparingABeverage"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingGlass"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#outputsCreated"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Juice"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
     </owl:Class>
     
 
@@ -6478,6 +6490,24 @@ Note that some events, such as an ice cube melting into a small puddle of water,
 
     <owl:Class rdf:about="http://ias.cs.tum.edu/kb/knowrob.owl#MakingTea-TheBeverage">
         <rdfs:subClassOf rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#PreparingABeverage"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingMug"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#TeaPacket"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#objectActedOn"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Water"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
         <rdfs:subClassOf>
             <owl:Restriction>
                 <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#outputsCreated"/>
