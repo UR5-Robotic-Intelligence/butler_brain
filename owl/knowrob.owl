@@ -7827,6 +7827,12 @@ Examples include the location of the center of mass of the Milky Way galaxy at t
                 <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#DrinkingVessel"/>
             </owl:Restriction>
         </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#outputsCreated"/>
+                <owl:someValuesFrom rdf:resource="http://ias.cs.tum.edu/kb/knowrob.owl#Drink"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
     </owl:Class>
     
 

@@ -90,7 +90,20 @@ if __name__ == "__main__":
         highest_vote = val['votes']
         best_candidate = key
     filtered_sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
-
+    
+    #########################################################################################################
+    # Remove all lower level candidates                                                                     #
+    # since they have the same number of votes as a higher level class, but they are more specific.         #
+    # and a higher level class is safer to use. such that we don't end up with a class that is too specific.#
+    # and the user can always ask for a more specific class if needed.                                      #
+    # TODO:: but take care, if the user asks for a specific class, and we don't have it, we will not be able#
+    #        to find a class that matches the request.                                                      #
+    #        so we need to handle this case, by asking the user to define the new unknown class.            #
+    #        For example for "make a cold drink", since we don't have a class for "cold drink", we will end #
+    #        up with "make a drink" which is not what the user wants.                                       #
+    #        so we need to ask the user to define the new class "cold drink" and then we can use it.        # 
+    #########################################################################################################
+    
     if len(filtered_sorted_candidates) > 1:
       for key, val in filtered_sorted_candidates:
         for comp in val['components']:
