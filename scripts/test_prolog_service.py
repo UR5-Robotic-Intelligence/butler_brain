@@ -3,7 +3,7 @@
 import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
-
+import fuzzywuzzy.fuzz as fuzz
 
 if __name__ == "__main__":
     rospy.init_node('test_rosprolog')
@@ -43,7 +43,7 @@ if __name__ == "__main__":
       # print("B: {}, C: {}, E: {}".format(B, C, E))
       Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
       for component in output_components:
-        if (component.lower() in B.lower()) or (component.lower() in C.lower()) or (component.lower() in Sc.lower()) or (component.lower() in Sb.lower()):
+        if (component.lower() in B.lower()) or (component.lower() in C.lower()):
           if B not in activities.keys():
             activities[B] = {'output':C, 'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1, 'super_activities':[Sb], 'super_objects':[Sc]}
           else:
@@ -92,6 +92,24 @@ if __name__ == "__main__":
     sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
 
     if len(sorted_candidates) > 1:
+      for key, val in sorted_candidates:
+        for comp in val['components']:
+          if 'score' not in val.keys():
+            val['score'] = 0
+          val['score'] += fuzz.ratio(comp, key)
+      sorted_candidates = sorted(sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
+    
+      print(sorted_candidates)
+
+      highest_score = -1
+      for key, val in sorted_candidates:
+        if val['score'] > highest_score:
+          highest_score = val['score']
+          best_candidate = key
+      sorted_candidates = list(
+          filter(lambda x: x[1]['score'] == highest_score, sorted_candidates))
+    
+    if len(sorted_candidates) > 1:
       print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
       for i, candidate in enumerate(sorted_candidates):
         print("{}. {}".format(i+1, candidate[0]))
@@ -103,6 +121,8 @@ if __name__ == "__main__":
       else:
         print("Invalid choice. Please try again.")
         exit()
+    
+    print(sorted_candidates)
     
     chosen_activity = {sorted_candidates[0][0]: sorted_candidates[0][1]}
     
