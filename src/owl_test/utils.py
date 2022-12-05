@@ -2,7 +2,6 @@ import os
 from gtts import gTTS
 import openai
 import speech_recognition as sr
-import pyttsx3
 import fuzzywuzzy.fuzz as fuzz
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
