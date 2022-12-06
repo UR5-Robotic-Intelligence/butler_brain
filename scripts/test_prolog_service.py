@@ -4,6 +4,7 @@ import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
 from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate
+from owl_test.ontology_utils import OntologyUtils
 import fuzzywuzzy.fuzz as fuzz
 import argparse
 import os
@@ -12,8 +13,9 @@ import os
 
 if __name__ == "__main__":
   rospy.init_node('test_rosprolog')
-  prolog = Prolog()
-  ns = "\"http://ias.cs.tum.edu/kb/knowrob.owl#"
+  ou = OntologyUtils()
+  prolog = ou.prolog
+  ns = ou.ns
   args = argparse.ArgumentParser(description='Test the rosprolog service')
   args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
   verbose = args.parse_args().verbose
@@ -179,31 +181,22 @@ if __name__ == "__main__":
   
   chosen_activity = filtered_sorted_candidates[0][1]
   chosen_activity["name"] = filtered_sorted_candidates[0][0]
+  chosen_activity_name = chosen_activity["name"]
   
-  if chosen_activity['level'] == 'superObject':
-    text_to_speech("Please specify what type of {} you want me to prepare".format(chosen_activity['name']), verbose=verbose)
-    exit()
-  
-  if chosen_activity['level'] == 'superActivity':
-    text_to_speech("Please specify what type of {} you want me to prepare".format(chosen_activity['components'][0]), verbose=verbose)
-    text_to_speech("I can prepare the following types of {}:".format(
-        chosen_activity['components'][0]))
-    query_string = "subclass_of(A, " + ns + chosen_activity['name'] + "\")."
-    query = prolog.query(query_string)
-    possible_activities = []
-    for solution in query.solutions():
-      possible_activities.append(solution['A'].split('#')[-1])
-    for i, candidate in enumerate(possible_activities):
-      text_to_speech("{}. {}".format(i+1, candidate), verbose=True)
-    # choice = get_top_matching_candidate(possible_activities, choice_text)
-    # choice_text = speach_to_text(verbose=verbose)
-    choice = int(input(text_to_speech("Enter your choice: ", verbose=True)))
-    chosen_activity['name'] = possible_activities[choice-1]
+  if chosen_activity['level'] in ['superActivity', 'superObject']:
+    if chosen_activity['level'] == 'superObject':
+      query_string = "is_restriction(A, some(" + ns + "outputsCreated\", " + ns + chosen_activity_name + "\")), subclass_of(B, A), \\+((subclass_of(Sb, A), subclass_of(B, Sb)))"
+      query = prolog.query(query_string)
+      for solution in query.solutions():
+        chosen_activity_name = solution["B"].split("#")[1]
+    activity_name, output_name = ou.handle_super_activity(chosen_activity_name, verbose=verbose)
+    if activity_name is None:
+      exit()
     sorted_candidates_dict = dict(sorted_candidates)
-    if chosen_activity['name'] in sorted_candidates_dict.keys():
-      chosen_activity = sorted_candidates_dict[chosen_activity['name']]
+    if activity_name in sorted_candidates_dict.keys():
+      chosen_activity = sorted_candidates_dict[activity_name]
     else:
-      text_to_speech("Will search for the activity in the ontology", verbose=verbose)
+      text_to_speech("Will make you {}".format(output_name), verbose=verbose)
       exit()
     
   
