@@ -26,20 +26,22 @@ if __name__ == "__main__":
   # output_of_gpt3 = "1.cup\n2.tea"
   # output_of_gpt3 = input("Enter the output of GPT-3: ")
   # user_request = input("Enter your request: ")
-  text_to_speech("Press enter to start the test", verbose=verbose)
-  input()
-  text_to_speech("Please say your request:", verbose=verbose)
-  user_request = speach_to_text(verbose=verbose)
-  output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
-  if verbose:
-    print(output_of_gpt3)
-  output_components = output_of_gpt3.strip().split("\n")
-  if verbose:
-    print(output_components)
-  output_components = [x.split(".")[-1].strip() for x in output_components]
-  if verbose:
-    print(output_components)
-  # output_components = ['drinking']
+  
+  # text_to_speech("Press enter to start the test", verbose=verbose)
+  # input()
+  # text_to_speech("Please say your request:", verbose=verbose)
+  # user_request = speach_to_text(verbose=verbose)
+  # output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
+  # if verbose:
+  #   print(output_of_gpt3)
+  # output_components = output_of_gpt3.strip().split("\n")
+  # if verbose:
+  #   print(output_components)
+  # output_components = [x.split(".")[-1].strip() for x in output_components]
+  # if verbose:
+  #   print(output_components)
+  
+  output_components = ['milk']
   
   comp_enc = [model.encode([component.lower()]).flatten() for component in output_components]
   
@@ -50,13 +52,13 @@ if __name__ == "__main__":
   # we first find all the activities that create a final product.
   # then we search for the activity that outputs an object that has the word "coffee" in its name.
   event_that_has_outputs_created = "is_restriction(A, some(" + ns + "outputsCreated\", C)), subclass_of(B, A), subclass_of(C, Sc)"
-  that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\")" 
+  that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\"), subclass_of(Other, Sc)"
   has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
   is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
-  non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
+  # non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
   
   query_string = "(" + event_that_has_outputs_created + ", " + that_are_subclass_of_food_or_drink + \
-      ", " + has_objects_acted_on + ", " + is_subclass_of_preparing_food_or_drink + "); " + non_activity_objects
+      ", " + has_objects_acted_on + ", " + is_subclass_of_preparing_food_or_drink + ")." #; " + non_activity_objects
   query = prolog.query(query_string)
   
   # votes represent the number of components from the output of GPT-3 that appear in the name of the objects or activities in the ontology.
@@ -64,6 +66,7 @@ if __name__ == "__main__":
   activities = {}
   super_activities = {}
   super_objects = {}
+  other_objects = {}
   is_component_used = {component:0 for component in output_components}
   sim_thresh = 0.66
   for solution in query.solutions():
@@ -72,14 +75,18 @@ if __name__ == "__main__":
     B, C, E = solution['B'].split('#')[-1], solution['C'].split('#')[-1],  solution['E'].split('#')[-1]
     # print("B: {}, C: {}, E: {}".format(B, C, E))
     Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
+    Other = solution['Other'].split('#')[-1]
+    
     B_enc, C_enc, E_enc = model.encode([B.lower()]).flatten(), model.encode([C.lower()]).flatten(), model.encode([E.lower()]).flatten()
     Sc_enc, Sb_enc = model.encode([Sc.lower()]).flatten(), model.encode([Sb.lower()]).flatten()
+    Other_enc = model.encode([Other.lower()]).flatten()
     
     for component, enc in zip(output_components, comp_enc):
       act_sim = cos_sim(enc, B_enc)
       output_sim = cos_sim(enc, C_enc)
       sup_act_sim = cos_sim(enc, Sb_enc)
       sup_obj_sim = cos_sim(enc, Sc_enc)
+      other_obj_sim = cos_sim(enc, Other_enc)
       if (act_sim >= sim_thresh) or (output_sim >= sim_thresh):
         is_component_used[component] = 1
         if B not in activities.keys():
@@ -106,7 +113,7 @@ if __name__ == "__main__":
         elif component not in super_activities[Sb]['components']:
           super_activities[Sb]['components'].append(component)
           super_activities[Sb]['votes'] += 1
-      if sup_obj_sim > sim_thresh:
+      if sup_obj_sim >= sim_thresh:
         is_component_used[component] = 1
         if Sc not in super_objects.keys():
           super_objects[Sc] = {'level': 'superObject',
@@ -117,6 +124,16 @@ if __name__ == "__main__":
           super_objects[Sc]['components'].append(component)
           super_objects[Sc]['votes'] += 1
         # print("Found activity {} that outputs {} and acts on {}".format(B, C, E))
+      if other_obj_sim >= sim_thresh:
+        is_component_used[component] = 1
+        if Other not in other_objects.keys():
+          other_objects[Other] = {'level': 'other',
+                                'components': [component], 'votes': 1, 'sim': other_obj_sim, 'super_object':Sc}
+        elif other_obj_sim > other_objects[Other]['sim']:
+          other_objects[Other]['sim'] = other_obj_sim
+        elif component not in other_objects[Other]['components']:
+          other_objects[Other]['components'].append(component)
+          other_objects[Other]['votes'] += 1
 
   query.finish()
   
@@ -129,7 +146,8 @@ if __name__ == "__main__":
   activities_list = sorted([(key, val) for key, val in activities.items()], key=lambda x: x[1]['votes'], reverse=True)
   super_activities_list = sorted([(key, val) for key, val in super_activities.items()], key=lambda x: x[1]['votes'], reverse=True)
   super_objects_list = sorted([(key, val) for key, val in super_objects.items()], key=lambda x: x[1]['votes'], reverse=True)
-  sorted_candidates = activities_list + super_activities_list + super_objects_list
+  other_objects_list = sorted([(key, val) for key, val in other_objects.items()], key=lambda x: x[1]['votes'], reverse=True)
+  sorted_candidates = activities_list + super_activities_list + super_objects_list + other_objects_list
   if len(sorted_candidates) < 1:
     text_to_speech("No activities or Food or Drink found to match your request",verbose=verbose)
     exit()
@@ -159,16 +177,16 @@ if __name__ == "__main__":
   #########################################################################################################
   
   # remove all lower level candidates
-  if len(filtered_sorted_candidates) > 1:
-    if verbose:
-      print("More than one candidate with the same number of votes, removing lower level candidates")
-    super_class_exists = False
-    for key2, val2 in filtered_sorted_candidates:
-        if val2['level'] in ['superActivity', 'superObject']:
-          super_class_exists = True
-          break
-    if super_class_exists:
-      filtered_sorted_candidates = list(filter(lambda x: x[1]['level'] in ['superActivity', 'superObject'], filtered_sorted_candidates))
+  # if len(filtered_sorted_candidates) > 1:
+  #   if verbose:
+  #     print("More than one candidate with the same number of votes, removing lower level candidates")
+  #   super_class_exists = False
+  #   for key2, val2 in filtered_sorted_candidates:
+  #       if val2['level'] in ['superActivity', 'superObject']:
+  #         super_class_exists = True
+  #         break
+  #   if super_class_exists:
+  #     filtered_sorted_candidates = list(filter(lambda x: x[1]['level'] in ['superActivity', 'superObject'], filtered_sorted_candidates))
   
   # score the candidates based on the similarity between the components of the candidate and the candidate name.
   if len(filtered_sorted_candidates) > 1:
@@ -216,6 +234,7 @@ if __name__ == "__main__":
   chosen_activity = filtered_sorted_candidates[0][1]
   chosen_activity["name"] = filtered_sorted_candidates[0][0]
   chosen_activity_name = chosen_activity["name"]
+  sorted_candidates_dict = dict(sorted_candidates)
   
   if chosen_activity['level'] in ['superActivity', 'superObject']:
     if chosen_activity['level'] == 'superObject':
@@ -226,14 +245,17 @@ if __name__ == "__main__":
     activity_name, output_name = ou.handle_super_activity(chosen_activity_name, verbose=verbose)
     if activity_name is None:
       exit()
-    sorted_candidates_dict = dict(sorted_candidates)
     if activity_name in sorted_candidates_dict.keys():
       chosen_activity = sorted_candidates_dict[activity_name]
     else:
       text_to_speech("Will make you {}".format(output_name), verbose=verbose)
       exit()
     
-  
+  if chosen_activity['level'] == 'other':
+    if chosen_activity_name in sorted_candidates_dict.keys():
+      chosen_activity = sorted_candidates_dict[chosen_activity_name]
+      text_to_speech("I know that {} is a {}, but I don't know the steps for preparing it".format(chosen_activity_name, chosen_activity['super_object']), verbose=verbose)
+      exit()
   # Find if it is a Drink or a Food
   found = False
   for val in ['Drink', 'Food']:
