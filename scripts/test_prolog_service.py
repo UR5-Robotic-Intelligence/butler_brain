@@ -3,12 +3,12 @@
 import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
-from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate
+from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate, cos_sim
 from owl_test.ontology_utils import OntologyUtils
 import fuzzywuzzy.fuzz as fuzz
 import argparse
 import os
-
+from sentence_transformers import SentenceTransformer
 
 
 if __name__ == "__main__":
@@ -19,12 +19,16 @@ if __name__ == "__main__":
   args = argparse.ArgumentParser(description='Test the rosprolog service')
   args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
   verbose = args.parse_args().verbose
+  model = SentenceTransformer('bert-base-nli-mean-tokens')
   
   # parse the output of GPT-3
   # output_of_gpt3 = "1.cup\n2.coffee"
   # output_of_gpt3 = "1.cup\n2.tea"
   # output_of_gpt3 = input("Enter the output of GPT-3: ")
   # user_request = input("Enter your request: ")
+  text_to_speech("Press enter to start the test", verbose=verbose)
+  input()
+  text_to_speech("Please say your request:", verbose=verbose)
   user_request = speach_to_text(verbose=verbose)
   output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
   if verbose:
@@ -35,7 +39,10 @@ if __name__ == "__main__":
   output_components = [x.split(".")[-1].strip() for x in output_components]
   if verbose:
     print(output_components)
-    
+  # output_components = ['drinking']
+  
+  comp_enc = [model.encode([component.lower()]).flatten() for component in output_components]
+  
   # Find the activity that outputs the components, and the name of the components in the ontology.
   # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
   # For example, GPT-3 may output "coffee", but the name of the coffee in the ontology is "Coffee-Beverage".
@@ -46,9 +53,10 @@ if __name__ == "__main__":
   that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\")" 
   has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
   is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
+  non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
   
-  query_string = event_that_has_outputs_created + ", " + that_are_subclass_of_food_or_drink + \
-      ", " + has_objects_acted_on + ", " + is_subclass_of_preparing_food_or_drink
+  query_string = "(" + event_that_has_outputs_created + ", " + that_are_subclass_of_food_or_drink + \
+      ", " + has_objects_acted_on + ", " + is_subclass_of_preparing_food_or_drink + "); " + non_activity_objects
   query = prolog.query(query_string)
   
   # votes represent the number of components from the output of GPT-3 that appear in the name of the objects or activities in the ontology.
@@ -56,16 +64,29 @@ if __name__ == "__main__":
   activities = {}
   super_activities = {}
   super_objects = {}
+  is_component_used = {component:0 for component in output_components}
+  sim_thresh = 0.66
   for solution in query.solutions():
+    # print(solution)
     # remove the namespace from the name of the activity
     B, C, E = solution['B'].split('#')[-1], solution['C'].split('#')[-1],  solution['E'].split('#')[-1]
     # print("B: {}, C: {}, E: {}".format(B, C, E))
     Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
-    for component in output_components:
-      if (component.lower() in B.lower()) or (component.lower() in C.lower()):
+    B_enc, C_enc, E_enc = model.encode([B.lower()]).flatten(), model.encode([C.lower()]).flatten(), model.encode([E.lower()]).flatten()
+    Sc_enc, Sb_enc = model.encode([Sc.lower()]).flatten(), model.encode([Sb.lower()]).flatten()
+    
+    for component, enc in zip(output_components, comp_enc):
+      act_sim = cos_sim(enc, B_enc)
+      output_sim = cos_sim(enc, C_enc)
+      sup_act_sim = cos_sim(enc, Sb_enc)
+      sup_obj_sim = cos_sim(enc, Sc_enc)
+      if (act_sim >= sim_thresh) or (output_sim >= sim_thresh):
+        is_component_used[component] = 1
         if B not in activities.keys():
-          activities[B] = {'output':C, 'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1, 'super_activities':[Sb], 'super_objects':[Sc]}
+          activities[B] = {'output':C, 'sim':max(act_sim, output_sim),'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1, 'super_activities':[Sb], 'super_objects':[Sc]}
         else:
+          if max(act_sim, output_sim) > activities[B]['sim']:
+            activities[B]['sim'] = max(act_sim, output_sim)
           if E not in activities[B]['objectActedOn']:
             activities[B]['objectActedOn'].append(E)
           if component not in activities[B]['components']:
@@ -75,24 +96,36 @@ if __name__ == "__main__":
             activities[B]['super_activities'].append(Sb)
           if Sc not in activities[B]['super_objects']:
             activities[B]['super_objects'].append(Sc)
-      if component.lower() in Sb.lower():
+      if sup_act_sim >= sim_thresh:
+        is_component_used[component] = 1
         if Sb not in super_activities.keys():
           super_activities[Sb] = {
-              'level': 'superActivity', 'components': [component], 'votes': 1}
+              'level': 'superActivity', 'components': [component], 'votes': 1, 'sim': sup_act_sim}
+        elif sup_act_sim > super_activities[Sb]['sim']:
+          super_activities[Sb]['sim'] = sup_act_sim
         elif component not in super_activities[Sb]['components']:
           super_activities[Sb]['components'].append(component)
           super_activities[Sb]['votes'] += 1
-      if component.lower() in Sc.lower():
+      if sup_obj_sim > sim_thresh:
+        is_component_used[component] = 1
         if Sc not in super_objects.keys():
           super_objects[Sc] = {'level': 'superObject',
-                                'components': [component], 'votes': 1}
+                                'components': [component], 'votes': 1, 'sim': sup_obj_sim}
+        elif sup_obj_sim > super_objects[Sc]['sim']:
+          super_objects[Sc]['sim'] = sup_obj_sim
         elif component not in super_objects[Sc]['components']:
           super_objects[Sc]['components'].append(component)
           super_objects[Sc]['votes'] += 1
         # print("Found activity {} that outputs {} and acts on {}".format(B, C, E))
 
   query.finish()
-
+  
+  # TODO: handle the case where the output of GPT-3 does not match any of the components in the ontology.
+  # for component, used in is_component_used.items():
+  #   if used == 0:
+  #     text_to_speech("I could not find a Food or Drink that matches your request for {}".format(component),verbose=verbose)
+  #     exit()
+  
   activities_list = sorted([(key, val) for key, val in activities.items()], key=lambda x: x[1]['votes'], reverse=True)
   super_activities_list = sorted([(key, val) for key, val in super_activities.items()], key=lambda x: x[1]['votes'], reverse=True)
   super_objects_list = sorted([(key, val) for key, val in super_objects.items()], key=lambda x: x[1]['votes'], reverse=True)
@@ -145,7 +178,8 @@ if __name__ == "__main__":
       for comp in val['components']:
         if 'score' not in val.keys():
           val['score'] = 0
-        val['score'] += fuzz.ratio(comp, key)
+        # val['score'] += fuzz.ratio(comp, key)
+        val['score'] += val['sim']
     filtered_sorted_candidates = sorted(filtered_sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
 
     if verbose:

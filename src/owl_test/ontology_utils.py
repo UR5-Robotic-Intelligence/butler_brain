@@ -27,6 +27,7 @@ class OntologyUtils:
     top_ratio = 0
     ratio_threshold = 100
     while top_ratio < ratio_threshold:
+      input("Press enter to continue")
       choice_text = speach_to_text(verbose=verbose, show_all=True)
       if type(choice_text) == str:
         choice_text = [choice_text]

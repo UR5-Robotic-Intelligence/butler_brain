@@ -14,6 +14,8 @@ from google.cloud import speech
 import pyaudio
 from six.moves import queue
 
+import numpy as np
+
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 google_api_key = os.environ.get("GOOGLE_API_KEY")
 
@@ -242,6 +244,7 @@ def speach_to_text(verbose=True, show_all=False):
             
             # Using google to recognize audio
             data = r.recognize_google(audio2, show_all=True, language="en-US")
+            # print(data)
             # MyText = MyText.lower()
             if len(data) > 0:
               if verbose:
@@ -306,6 +309,8 @@ def get_top_matching_candidate(candidate_list, match_with_list):
   print(all_matches)
   return top_candidate_index, top_match_index, top_ratio
 
+def cos_sim(a, b):
+  return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
 
 if __name__ == '__main__':
   # print(text_to_keywords("Q:Prepare a meal for dinner please:\n", verbose=True))
