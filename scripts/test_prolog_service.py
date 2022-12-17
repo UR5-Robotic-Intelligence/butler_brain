@@ -54,7 +54,7 @@ if __name__ == "__main__":
   # if verbose:
   #   print(output_components)
   
-  output_components = ['milk']
+  output_components = ['coffee']
   
   comp_enc = model.encode([component.lower() for component in output_components], device='cuda')
   
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # we first find all the activities that create a final product.
     # then we search for the activity that outputs an object that has the word "coffee" in its name.
     event_that_has_outputs_created = "is_restriction(A, some(" + ns + "outputsCreated\", C)), subclass_of(B, A), subclass_of(C, Sc)"
-    that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\"), subclass_of(Other, Sc)"
+    that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\"), subclass_of(Other, Sc), \\+is_restriction(_, some(" + ns + "outputsCreated\", Other))"
     has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
     is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
     # non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
