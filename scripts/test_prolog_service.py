@@ -54,7 +54,8 @@ if __name__ == "__main__":
   # if verbose:
   #   print(output_components)
   
-  output_components = ['coffee']
+  # output_components = ['chocolate', 'milk']
+  output_components = ['drinking']
   
   comp_enc = model.encode([component.lower() for component in output_components], device='cuda')
   
@@ -96,7 +97,7 @@ if __name__ == "__main__":
   super_objects = {}
   other_objects = {}
   is_component_used = {component:0 for component in output_components}
-  sim_thresh = 0.66
+  sim_thresh = 0.8
   data = {}
   encoded_before = {}
   if load_embeddings:
@@ -320,7 +321,7 @@ if __name__ == "__main__":
   if chosen_activity['level'] == 'other':
     if chosen_activity_name in sorted_candidates_dict.keys():
       chosen_activity = sorted_candidates_dict[chosen_activity_name]
-      text_to_speech("I know that {} is a {}, but I don't know the steps for preparing it".format(chosen_activity_name, chosen_activity['super_object']), verbose=verbose)
+      text_to_speech("I know that {} is a {}, but I don't know the steps for preparing it, could you please tell me the steps?".format(chosen_activity_name, chosen_activity['super_object']), verbose=verbose)
       exit()
   # Find if it is a Drink or a Food
   found = False
