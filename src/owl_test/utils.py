@@ -15,6 +15,8 @@ import pyaudio
 from six.moves import queue
 
 import numpy as np
+from tqdm import tqdm
+
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 google_api_key = os.environ.get("GOOGLE_API_KEY")
@@ -50,6 +52,17 @@ Q:Do you have some falafel?
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
+
+def write_embeddings(path, embeddings, vocab):
+    
+    with open(path, 'w') as f:
+        for i, embedding in enumerate(tqdm(embeddings)):
+            word = vocab[i]
+            #skip words with unicode symbols
+            # if len(word) != len(word.encode()):
+            #     continue
+            vector = ' '.join([str(i) for i in embedding.tolist()])
+            f.write(f'{word} {vector}\n')
 
 
 class MicrophoneStream(object):

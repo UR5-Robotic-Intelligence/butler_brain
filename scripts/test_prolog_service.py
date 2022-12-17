@@ -3,13 +3,16 @@
 import rospy
 from rosprolog_client import Prolog
 from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
-from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate, cos_sim
+from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate, cos_sim, write_embeddings
 from owl_test.ontology_utils import OntologyUtils
 import fuzzywuzzy.fuzz as fuzz
 import argparse
 import os
 from sentence_transformers import SentenceTransformer
-
+import torchtext.vocab as vocab
+import torch
+import time
+import pickle
 
 if __name__ == "__main__":
   rospy.init_node('test_rosprolog')
@@ -18,9 +21,19 @@ if __name__ == "__main__":
   ns = ou.ns
   args = argparse.ArgumentParser(description='Test the rosprolog service')
   args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
+  args.add_argument('-s', '--save_embeddings', action='store_true', help='Save the query embeddings to a file')
+  args.add_argument('-l', '--load_embeddings', action='store_true', help='Load the query embeddings from a file')
+  args.add_argument('-lq', '--load_query_results', action='store_true', help='Load the query results from a file')
+  args.add_argument('-sq', '--save_query_results', action='store_true', help='Save the query results to a file')
   verbose = args.parse_args().verbose
+  load_embeddings = args.parse_args().load_embeddings
+  save_embeddings = args.parse_args().save_embeddings
+  load_query_results = args.parse_args().load_query_results
+  save_query_results = args.parse_args().save_query_results
   model = SentenceTransformer('bert-base-nli-mean-tokens')
-  
+  data_path = os.path.join(os.getcwd(), 'uji_butler_wokring_memory.txt')
+  query_results_path = os.path.join(os.getcwd(), 'query_results.pkl')
+
   # parse the output of GPT-3
   # output_of_gpt3 = "1.cup\n2.coffee"
   # output_of_gpt3 = "1.cup\n2.tea"
@@ -43,24 +56,39 @@ if __name__ == "__main__":
   
   output_components = ['milk']
   
-  comp_enc = [model.encode([component.lower()]).flatten() for component in output_components]
+  comp_enc = model.encode([component.lower() for component in output_components], device='cuda')
   
-  # Find the activity that outputs the components, and the name of the components in the ontology.
-  # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
-  # For example, GPT-3 may output "coffee", but the name of the coffee in the ontology is "Coffee-Beverage".
-  # so we need to find the activity that outputs an object the has the word "coffee" in its name.
-  # we first find all the activities that create a final product.
-  # then we search for the activity that outputs an object that has the word "coffee" in its name.
-  event_that_has_outputs_created = "is_restriction(A, some(" + ns + "outputsCreated\", C)), subclass_of(B, A), subclass_of(C, Sc)"
-  that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\"), subclass_of(Other, Sc)"
-  has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
-  is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
-  # non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
+  ##########################################################################################################################################
+  # This is like the working memory of the robot.                                                                                          #
+  # A more realistic implementation would be to detect the objects in the environment and update the working memory.                       #
+  # according to the objects that are detected, and the environment, the robot will generate a different query.                            #
+  # For example, if the robot is in the kitchen, it will generate a query that includes the activities that are performed in the kitchen.  #
+  ##########################################################################################################################################
   
-  query_string = "(" + event_that_has_outputs_created + ", " + that_are_subclass_of_food_or_drink + \
-      ", " + has_objects_acted_on + ", " + is_subclass_of_preparing_food_or_drink + ")." #; " + non_activity_objects
-  query = prolog.query(query_string)
+  if load_query_results:
+    with open(query_results_path, 'rb') as f:
+      query_results = pickle.load(f)
   
+  else:
+    # Find the activity that outputs the components, and the name of the components in the ontology.
+    # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
+    # For example, GPT-3 may output "coffee", but the name of the coffee in the ontology is "Coffee-Beverage".
+    # so we need to find the activity that outputs an object the has the word "coffee" in its name.
+    # we first find all the activities that create a final product.
+    # then we search for the activity that outputs an object that has the word "coffee" in its name.
+    event_that_has_outputs_created = "is_restriction(A, some(" + ns + "outputsCreated\", C)), subclass_of(B, A), subclass_of(C, Sc)"
+    that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\"), subclass_of(Other, Sc)"
+    has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
+    is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
+    # non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
+    
+    query_string = "(" + event_that_has_outputs_created + ", " + that_are_subclass_of_food_or_drink + \
+        ", " + has_objects_acted_on + ", " + is_subclass_of_preparing_food_or_drink + ")." #; " + non_activity_objects
+    # query = prolog.query(query_string)
+    query_results = prolog.all_solutions(query_string)
+    if save_query_results:
+      with open(query_results_path, 'wb') as f:
+        pickle.dump(query_results, f)
   # votes represent the number of components from the output of GPT-3 that appear in the name of the objects or activities in the ontology.
   # the activity with the highest number of votes is the activity that we are looking for.
   activities = {}
@@ -69,17 +97,47 @@ if __name__ == "__main__":
   other_objects = {}
   is_component_used = {component:0 for component in output_components}
   sim_thresh = 0.66
-  for solution in query.solutions():
+  data = {}
+  encoded_before = {}
+  if load_embeddings:
+    trained_embeddings = vocab.Vectors(name = data_path,
+                                   cache = 'custom_embeddings',
+                                   unk_init = torch.Tensor.normal_)
+  
+  for solution in query_results:
+    encodings = []
     # print(solution)
     # remove the namespace from the name of the activity
     B, C, E = solution['B'].split('#')[-1], solution['C'].split('#')[-1],  solution['E'].split('#')[-1]
     # print("B: {}, C: {}, E: {}".format(B, C, E))
     Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
     Other = solution['Other'].split('#')[-1]
+    if not load_embeddings:
+      # encode the activity and the objects
+      to_encode = [B.lower(), C.lower(), E.lower(), Sc.lower(), Sb.lower(), Other.lower()]
+      encodings = model.encode(to_encode, device='cuda:0')
+    else:
+      tokens = [B, C, E, Sc, Sb, Other]
+      for token in tokens:
+        if token in encoded_before:
+          encodings.append(encoded_before[token])
+        else:
+          token_idx = trained_embeddings.stoi[token]
+          encodings.append(trained_embeddings.vectors[token_idx].numpy())
+      # encodings = trained_embeddings.get_vecs_by_tokens(tokens=tokens,lower_case_backup=True).numpy()
+
+    for token, enc in zip(tokens, encodings):
+      if token not in encoded_before:
+        encoded_before[token] = enc
+
+    B_enc, C_enc, E_enc = encodings[0], encodings[1], encodings[2]
+    Sc_enc, Sb_enc = encodings[3], encodings[4]
+    Other_enc = encodings[5]
     
-    B_enc, C_enc, E_enc = model.encode([B.lower()]).flatten(), model.encode([C.lower()]).flatten(), model.encode([E.lower()]).flatten()
-    Sc_enc, Sb_enc = model.encode([Sc.lower()]).flatten(), model.encode([Sb.lower()]).flatten()
-    Other_enc = model.encode([Other.lower()]).flatten()
+    if save_embeddings:
+      data[B], data[C], data[E] = B_enc, C_enc, E_enc
+      data[Sc], data[Sb] = Sc_enc, Sb_enc
+      data[Other] = Other_enc
     
     for component, enc in zip(output_components, comp_enc):
       act_sim = cos_sim(enc, B_enc)
@@ -90,7 +148,14 @@ if __name__ == "__main__":
       if (act_sim >= sim_thresh) or (output_sim >= sim_thresh):
         is_component_used[component] = 1
         if B not in activities.keys():
-          activities[B] = {'output':C, 'sim':max(act_sim, output_sim),'objectActedOn':[E], 'level':'activity', 'components':[component], 'votes':1, 'super_activities':[Sb], 'super_objects':[Sc]}
+          activities[B] = {'output':C,\
+                           'sim':max(act_sim, output_sim),\
+                           'objectActedOn':[E],\
+                           'level':'activity',\
+                           'components':[component],\
+                           'votes':1,\
+                           'super_activities':[Sb],\
+                           'super_objects':[Sc]}
         else:
           if max(act_sim, output_sim) > activities[B]['sim']:
             activities[B]['sim'] = max(act_sim, output_sim)
@@ -135,7 +200,8 @@ if __name__ == "__main__":
           other_objects[Other]['components'].append(component)
           other_objects[Other]['votes'] += 1
 
-  query.finish()
+  if save_embeddings:
+    write_embeddings(data_path, list(data.values()), list(data.keys()))
   
   # TODO: handle the case where the output of GPT-3 does not match any of the components in the ontology.
   # for component, used in is_component_used.items():
