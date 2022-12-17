@@ -353,8 +353,8 @@ if __name__ == "__main__":
     query.finish()
   chosen_activity['objectActedOn'] = filtered_objects
   if chosen_activity['type'] == 'Drink':
-    prepareADrink(chosen_activity['output'])
+    prepareADrink(chosen_activity)
   elif chosen_activity['type'] == 'Food':
-    prepareAMeal(chosen_activity['output'])
+    prepareAMeal(chosen_activity)
   else:
-    bringObject(chosen_activity['output'])
+    bringObject(chosen_activity)
