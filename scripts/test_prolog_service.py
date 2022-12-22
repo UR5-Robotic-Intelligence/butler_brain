@@ -22,8 +22,8 @@ if __name__ == "__main__":
   args = argparse.ArgumentParser(description='Test the rosprolog service')
   args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
   args.add_argument('-s', '--save_embeddings', action='store_true', help='Save the query embeddings to a file')
-  args.add_argument('-l', '--load_embeddings', action='store_true', help='Load the query embeddings from a file')
-  args.add_argument('-lq', '--load_query_results', action='store_true', help='Load the query results from a file')
+  args.add_argument('-l', '--load_embeddings', action='store_true', help='Load the query embeddings from a file', default=True)
+  args.add_argument('-lq', '--load_query_results', action='store_true', help='Load the query results from a file',default=True)
   args.add_argument('-sq', '--save_query_results', action='store_true', help='Save the query results to a file')
   verbose = args.parse_args().verbose
   load_embeddings = args.parse_args().load_embeddings
@@ -40,22 +40,23 @@ if __name__ == "__main__":
   # output_of_gpt3 = input("Enter the output of GPT-3: ")
   # user_request = input("Enter your request: ")
   
-  # text_to_speech("Press enter to start the test", verbose=verbose)
-  # input()
-  # text_to_speech("Please say your request:", verbose=verbose)
-  # user_request = speach_to_text(verbose=verbose)
-  # output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
-  # if verbose:
-  #   print(output_of_gpt3)
-  # output_components = output_of_gpt3.strip().split("\n")
-  # if verbose:
-  #   print(output_components)
-  # output_components = [x.split(".")[-1].strip() for x in output_components]
-  # if verbose:
-  #   print(output_components)
+  text_to_speech("Press enter to start the test", verbose=verbose)
+  input()
+  text_to_speech("Please say your request:", verbose=verbose)
+  user_request = speach_to_text(verbose=verbose)
+  output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
+  if verbose:
+    print(output_of_gpt3)
+  output_components = output_of_gpt3.strip().split("\n")
+  if verbose:
+    print(output_components)
+  output_components = [x.split(".")[-1].strip() for x in output_components]
+  if verbose:
+    print(output_components)
   
   # output_components = ['chocolate', 'milk']
-  output_components = ['drinking']
+  # output_components = ['tea', 'beverage']
+  # output_components = ['drinking']
   
   comp_enc = model.encode([component.lower() for component in output_components], device='cuda')
   
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     # then we search for the activity that outputs an object that has the word "coffee" in its name.
     event_that_has_outputs_created = "is_restriction(A, some(" + ns + "outputsCreated\", C)), subclass_of(B, A), subclass_of(C, Sc)"
     that_are_subclass_of_food_or_drink = "subclass_of(Sc, " + ns + "FoodOrDrink\"), subclass_of(Other, Sc), \\+is_restriction(_, some(" + ns + "outputsCreated\", Other))"
-    has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb)" # \\+((subclass_of(Sb, D), subclass_of(B, Sb)))"
+    has_objects_acted_on = "is_restriction(D, some(" + ns + "objectActedOn\", E)), subclass_of(B, D), subclass_of(B, Sb), \\+subclass_of(Sb, D)"
     is_subclass_of_preparing_food_or_drink = "subclass_of(Sb,  " + ns + "PreparingFoodOrDrink\")"
     # non_activity_objects = "(subclass_of(NAO, " + ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
     
@@ -97,7 +98,7 @@ if __name__ == "__main__":
   super_objects = {}
   other_objects = {}
   is_component_used = {component:0 for component in output_components}
-  sim_thresh = 0.8
+  sim_thresh = 0.66
   data = {}
   encoded_before = {}
   if load_embeddings:
@@ -110,7 +111,7 @@ if __name__ == "__main__":
     # print(solution)
     # remove the namespace from the name of the activity
     B, C, E = solution['B'].split('#')[-1], solution['C'].split('#')[-1],  solution['E'].split('#')[-1]
-    # print("B: {}, C: {}, E: {}".format(B, C, E))
+    print("B: {}, C: {}, E: {}".format(B, C, E))
     Sc, Sb = solution['Sc'].split('#')[-1], solution['Sb'].split('#')[-1]
     Other = solution['Other'].split('#')[-1]
     if not load_embeddings:
@@ -143,14 +144,15 @@ if __name__ == "__main__":
     for component, enc in zip(output_components, comp_enc):
       act_sim = cos_sim(enc, B_enc)
       output_sim = cos_sim(enc, C_enc)
+      acted_on_sim = cos_sim(enc, E_enc)
       sup_act_sim = cos_sim(enc, Sb_enc)
       sup_obj_sim = cos_sim(enc, Sc_enc)
       other_obj_sim = cos_sim(enc, Other_enc)
-      if (act_sim >= sim_thresh) or (output_sim >= sim_thresh):
+      if (act_sim >= sim_thresh) or (output_sim >= sim_thresh) or (acted_on_sim >= sim_thresh):
         is_component_used[component] = 1
         if B not in activities.keys():
           activities[B] = {'output':C,\
-                           'sim':max(act_sim, output_sim),\
+                           'sim':[max(act_sim, output_sim, acted_on_sim)],\
                            'objectActedOn':[E],\
                            'level':'activity',\
                            'components':[component],\
@@ -158,13 +160,12 @@ if __name__ == "__main__":
                            'super_activities':[Sb],\
                            'super_objects':[Sc]}
         else:
-          if max(act_sim, output_sim) > activities[B]['sim']:
-            activities[B]['sim'] = max(act_sim, output_sim)
           if E not in activities[B]['objectActedOn']:
             activities[B]['objectActedOn'].append(E)
           if component not in activities[B]['components']:
             activities[B]['components'].append(component)
             activities[B]['votes'] += 1
+            activities[B]['sim'].append(max(act_sim, output_sim, acted_on_sim))
           if Sb not in activities[B]['super_activities']:
             activities[B]['super_activities'].append(Sb)
           if Sc not in activities[B]['super_objects']:
@@ -173,33 +174,30 @@ if __name__ == "__main__":
         is_component_used[component] = 1
         if Sb not in super_activities.keys():
           super_activities[Sb] = {
-              'level': 'superActivity', 'components': [component], 'votes': 1, 'sim': sup_act_sim}
-        elif sup_act_sim > super_activities[Sb]['sim']:
-          super_activities[Sb]['sim'] = sup_act_sim
+              'level': 'superActivity', 'components': [component], 'votes': 1, 'sim': [sup_act_sim]}
         elif component not in super_activities[Sb]['components']:
           super_activities[Sb]['components'].append(component)
           super_activities[Sb]['votes'] += 1
+          super_activities[Sb]['sim'].append(sup_act_sim)
       if sup_obj_sim >= sim_thresh:
         is_component_used[component] = 1
         if Sc not in super_objects.keys():
           super_objects[Sc] = {'level': 'superObject',
-                                'components': [component], 'votes': 1, 'sim': sup_obj_sim}
-        elif sup_obj_sim > super_objects[Sc]['sim']:
-          super_objects[Sc]['sim'] = sup_obj_sim
+                                'components': [component], 'votes': 1, 'sim': [sup_obj_sim]}
         elif component not in super_objects[Sc]['components']:
           super_objects[Sc]['components'].append(component)
           super_objects[Sc]['votes'] += 1
+          super_objects[Sc]['sim'].append(sup_obj_sim)
         # print("Found activity {} that outputs {} and acts on {}".format(B, C, E))
       if other_obj_sim >= sim_thresh:
         is_component_used[component] = 1
         if Other not in other_objects.keys():
           other_objects[Other] = {'level': 'other',
-                                'components': [component], 'votes': 1, 'sim': other_obj_sim, 'super_object':Sc}
-        elif other_obj_sim > other_objects[Other]['sim']:
-          other_objects[Other]['sim'] = other_obj_sim
+                                'components': [component], 'votes': 1, 'sim': [other_obj_sim], 'super_object':Sc}
         elif component not in other_objects[Other]['components']:
           other_objects[Other]['components'].append(component)
           other_objects[Other]['votes'] += 1
+          other_objects[Other]['sim'].append(other_obj_sim)
 
   if save_embeddings:
     write_embeddings(data_path, list(data.values()), list(data.keys()))
@@ -223,12 +221,13 @@ if __name__ == "__main__":
     print("Cadidates are: ", [(name, v['level']) for name, v in sorted_candidates])
   
   # Keep only the activities that have the highest number of votes.
-  highest_vote = -1
-  for key, val in sorted_candidates:
-    if val['votes'] > highest_vote:
-      highest_vote = val['votes']
-      best_candidate = key
-  filtered_sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
+  # highest_vote = -1
+  # for key, val in sorted_candidates:
+  #   if val['votes'] > highest_vote:
+  #     highest_vote = val['votes']
+  #     best_candidate = key
+  # filtered_sorted_candidates = list(filter(lambda x: x[1]['votes'] == highest_vote, sorted_candidates))
+  filtered_sorted_candidates = sorted_candidates
   
   #########################################################################################################
   # Remove all lower level candidates                                                                     #
@@ -260,11 +259,7 @@ if __name__ == "__main__":
     if verbose:
       print("More than one candidate with the same number of votes, scoring candidates based on the similarity between the components of the candidate and the candidate name")
     for key, val in filtered_sorted_candidates:
-      for comp in val['components']:
-        if 'score' not in val.keys():
-          val['score'] = 0
-        # val['score'] += fuzz.ratio(comp, key)
-        val['score'] += val['sim']
+      val['score'] = sum(val['sim'])
     filtered_sorted_candidates = sorted(filtered_sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
 
     if verbose:
@@ -281,7 +276,7 @@ if __name__ == "__main__":
   
   if verbose:
     print("After filtering, cadidates are: ", [(name, v['level']) for name, v in filtered_sorted_candidates])
-  
+
   if len(filtered_sorted_candidates) > 1:
     print("I am not sure which activity you want me to perform. Please choose one of the following activities:")
     for i, candidate in enumerate(filtered_sorted_candidates):
@@ -314,6 +309,7 @@ if __name__ == "__main__":
       exit()
     if activity_name in sorted_candidates_dict.keys():
       chosen_activity = sorted_candidates_dict[activity_name]
+      chosen_activity['name'] = activity_name
     else:
       text_to_speech("Will make you {}".format(output_name), verbose=verbose)
       exit()

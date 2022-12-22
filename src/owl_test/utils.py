@@ -160,7 +160,7 @@ def listen_print_loop(responses):
         if not result.alternatives:
             continue
         
-        return result
+        # return result
         # Display the transcription of the top alternative.
         transcript = result.alternatives[0].transcript
 
@@ -170,14 +170,15 @@ def listen_print_loop(responses):
         # If the previous result was longer than this one, we need to print
         # some extra spaces to overwrite the previous result
         overwrite_chars = " " * (num_chars_printed - len(transcript))
-
         if not result.is_final:
-            sys.stdout.write(transcript + overwrite_chars + "\r")
-            sys.stdout.flush()
+            # sys.stdout.write(transcript + overwrite_chars + "\r")
+            # sys.stdout.flush()
 
             num_chars_printed = len(transcript)
 
         else:
+            num_chars_printed = 0
+            return transcript + overwrite_chars
             print(transcript + overwrite_chars)
 
             # Exit recognition if any of the transcribed phrases could be
@@ -189,7 +190,7 @@ def listen_print_loop(responses):
             num_chars_printed = 0
 
 
-def speach_to_text_(verbose=True, show_all=False): # under development
+def speach_to_text(verbose=True, show_all=False): # under development
     # See http://g.co/cloud/speech/docs/languages
     # for a list of supported languages.
     language_code = "en-US"  # a BCP-47 language tag
@@ -219,24 +220,27 @@ def speach_to_text_(verbose=True, show_all=False): # under development
 
             # Now, put the transcription responses to use.
             data =  listen_print_loop(responses)
-            print(data)
-            # if len(data.alternatives[0].transcript) > 0:
-            #   if verbose:
-            #     print(data)
-            #   if data['alternative'][0]['confidence'] >= 0.8 and not show_all:
-            #       MyText = data['alternative'][0]['transcript'].lower()
-            #   elif show_all:
-            #     MyText = [val['transcript'].lower() for val in data['alternative']]
-            #   else:
-            #     continue
-            #   if verbose:
-            #     print(MyText)
-            #   return MyText
+            MyText = data.lower()
+            if verbose:
+              print(MyText)
+            return MyText
+            if len(data.alternatives[0].transcript) > 0:
+              if verbose:
+                print(data)
+              if data['alternative'][0]['confidence'] >= 0.8 and not show_all:
+                  MyText = data['alternative'][0]['transcript'].lower()
+              elif show_all:
+                MyText = [val['transcript'].lower() for val in data['alternative']]
+              else:
+                continue
+              if verbose:
+                print(MyText)
+              return MyText
       except Exception as e:
         if verbose:
           print("unknown error occurred")
 
-def speach_to_text(verbose=True, show_all=False):
+def speach_to_text_(verbose=True, show_all=False):
  
   # Initialize the recognizer
   r = sr.Recognizer()
@@ -328,6 +332,7 @@ def cos_sim(a, b):
 if __name__ == '__main__':
   # print(text_to_keywords("Q:Prepare a meal for dinner please:\n", verbose=True))
   speach_to_text()
+  # speach_to_text_()
   # data = {'alternative': [{'transcript': 't', 'confidence': 0.29859412}, {'transcript': 'tea'}, {'transcript': 'teeth'}, {'transcript': 'tee'}], 'final': True}
   # candidates = [val['transcript'] for val in data['alternative']]
   # match_with = ['MakingTea-TheBeverage', 'MakingCoffee-TheBeverage', 'MakingJuice']

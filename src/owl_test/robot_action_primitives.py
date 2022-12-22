@@ -24,7 +24,7 @@ class ObjectFinder:
         text_snippets = ["a photo of a {}".format(name) for name in object_names]
         text_snippets.append("a photo of something else")
         # pre-process text
-        text = clip.tokenize(text_snippets).to(device)
+        text = clip.tokenize(text_snippets).to(self.device)
         
         # with torch.no_grad():
         #     text_features = model.encode_text(text)
