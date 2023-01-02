@@ -1,108 +1,98 @@
-import torch
-import clip
-from PIL import Image
-import numpy as np
+#!/usr/bin/env python
+from owl_test.utils import text_to_speech, speach_to_text
+import rospy
+from butler_perception.segment_pcl import PCLProcessor
+from butler_action.butler_actions import ButlerActions
+from math import pi
 
 
-class ObjectFinder:
-    def __init__(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        # load model and image preprocessing
-        self.model, self.preprocess = clip.load("ViT-B/32", device=device, jit=False)
-    def segment_on_table_objects(self, image):
-        objects_on_table_roi = []
-        center_locations = []
-        return objects_on_table_roi, center_locations
-
-    def find_object(self, object_names, image, depth_image):
-        objects_on_table_roi, center_loc = self.segment_on_table_objects(depth_image)
-        objects_images = []
-        for object_roi in objects_on_table_roi:
-            objects_images.append(image[object_roi[0]:object_roi[1], object_roi[2]:object_roi[3]])
-
-        text_snippets = ["a photo of a {}".format(name) for name in object_names]
-        text_snippets.append("a photo of something else")
-        # pre-process text
-        text = clip.tokenize(text_snippets).to(self.device)
+class RobotActionPrimitives:
+    def __init__(self, verbose=True):
+        self.verbose = verbose
+        self.pcl_proc = PCLProcessor()
         
-        # with torch.no_grad():
-        #     text_features = model.encode_text(text)
-        detected_objects = [None] * len(object_names)
-        for i, object_image in enumerate(objects_images):
-            # pre-process image
-            prepro_image = self.preprocess(object_image).unsqueeze(0).to(self.device)
-            
-            # with torch.no_grad():
-            #     image_features = model.encode_image(prepro_image)
-            
-            with torch.no_grad():
-                logits_per_image, logits_per_text = model(prepro_image, text)
-                probs = logits_per_image.softmax(dim=-1).cpu().numpy()
-            # print("Label probs:", ["{0:.10f}".format(i) for i in probs[0]])
-            if probs[0][-1] < 0.5:
-                detected_objects[np.argmax(probs[0])] = center_loc[i]
-        return detected_objects
+        self.possible_answers = lambda obj_name:["done", "here it is", "here", "take it", "take",
+                                                    "i brought it",
+                                                    "i brought you the {}".format(obj_name),
+                                                    "continue",
+                                                    "i brought you a {}".format(obj_name)]
+        self.ba = ButlerActions()
+        self.pinch_pos_shift = (-0.03, 0.05, 0.003)
+        self.power_pos_shift = (0, 0.05, 0)
+        self.pinch_ori_shift = (0, 25*pi/180, 0)
+        self.power_ori_shift = (0, 0, 0)
+        self.obj_shift = {"teapacket": {'pos':self.pinch_pos_shift, 'ori':self.pinch_ori_shift, 'grip_pos':110},
+                          "cup": {'pos':self.power_pos_shift, 'ori':self.power_ori_shift, 'grip_pos':75},
+                          "sugar": {'pos':self.pinch_pos_shift, 'ori':self.pinch_ori_shift, 'grip_pos':75},
+                          "coffee": {'pos':self.pinch_pos_shift, 'ori':self.pinch_ori_shift, 'grip_pos':75}}
         
 
-def FindObject(object_name):
-    print("Finding an object named {}".format(object_name))
-    pass
+    def find(self, object_name):
+        all_objects_names = list(object_name) if type(object_name) == list else [object_name]
+        print("Finding the following objects {}".format(all_objects_names))
+        return self.pcl_proc.get_object_location(n_trials=10, object_names=all_objects_names, number=True)
 
-def PickObject(object_location):
-    print("Picking an object located at {}".format(object_location))
-    pass
+    def pick(self, object_name, object_loc, step_axis=1, step=0, frame_name=None):
+        if frame_name is None:
+            frame_name = object_name
+        print(f"Picking the following object {object_name}")
+        # CREATE FRAMES FOR OBJECTS
+        self.ba.create_frames_for_objects({frame_name: object_loc})
+        rospy.sleep(1.0)
 
-def PlaceObject(object_location):
-    print("Placing an object at {}".format(object_location))
-    pass
+        # MOVE TO TEA PACKET
+        self.ba.move_to_frame_pose_oriented(frame_name,
+                                        position_shift=self.obj_shift[object_name]['pos'],
+                                        orientation_shift=self.obj_shift[object_name]['ori'],
+                                        step_axis=step_axis,
+                                        step=step)
+        
+        # GRIP
+        self.ba.grip_control.move_gripper(self.obj_shift[object_name]['grip_pos'])
+        
+    def place(self, object_name, object_loc, frame_name=None):
+        if frame_name is None:
+            frame_name = object_name
+        print(f"Placing the following object {object_name}")
+        # CREATE FRAMES FOR OBJECTS
+        self.ba.create_frames_for_objects({frame_name: object_loc})
+        rospy.sleep(1.0)
+        
+        # MOVE TO OBJECT LOCATION
+        self.ba.move_to_frame_pos(frame_name, position_shift=(-0.03, 0.12, 0.16))
+        self.ba.move_to_frame_pos(frame_name, position_shift=(-0.03, 0.05, 0.08), touch=False)
+        
+        # OPEN GRIPPER
+        self.ba.grip_control.move_gripper(0)
 
-def PourObject(object_location):
-    print("Pouring an object at {}".format(object_location))
-    pass
+    def pour(self, object_location):
+        print("Pouring an object at {}".format(object_location))
+        pass
 
-def OpenObject(object_location):
-    print("Opening an object at {}".format(object_location))
-    pass
+    def open(self, object_location):
+        print("Opening an object at {}".format(object_location))
+        pass
 
-def PushButton(object_location):
-    print("Pushing a button at {}".format(object_location))
-    pass
+    def push_button(object_location):
+        print("Pushing a button at {}".format(object_location))
+        pass
+
+    def wait_for(self, object_name, verbose=False):
+        while not rospy.is_shutdown():
+            text = speach_to_text(verbose=verbose)
+            found = False
+            for answer in self.possible_answers(object_name):
+                if answer in text:
+                    found = True
+            if found:
+                object_loc = self.find(object_name)
+                if object_loc is None:
+                    text_to_speech("I still don't see a cup. Please bring me a cup.", verbose=verbose)
+                    continue
+                return object_loc
+                    
 
 if __name__ == '__main__':
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # load model and image preprocessing
-    model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
-
-    # Set up the image URL
-    image_name = "/home/bass/Pictures/tea_packet.jpg"
-
-    # load image
-    image = Image.open(image_name)
-
-    # pre-process image
-    image = preprocess(image).unsqueeze(0).to(device)
-    print("\n\nTensor shape:")
-    print(image.shape)
-    
-    with torch.no_grad():
-        image_features = model.encode_image(image)
-    print(image_features.shape)
-    
-    text_snippets = ["a photo of a tea", "a photo of a tea packet", "a photo of a coffee", "a photo of a coffee packet", "a photo of something else"]
-    # text_snippets = ["a photo of a dog", "a photo of a cat", "a photo of a bird", "a photo of a fish", "a photo of something else"]
-
-    # pre-process text
-    text = clip.tokenize(text_snippets).to(device)
-    print(text.shape)
-    
-    with torch.no_grad():
-        text_features = model.encode_text(text)
-    print(text_features.shape)
-    
-    with torch.no_grad():
-        logits_per_image, logits_per_text = model(image, text)
-        probs = logits_per_image.softmax(dim=-1).cpu().numpy()
-    print("Label probs:", ["{0:.10f}".format(i) for i in probs[0]])
-    
+    rospy.init_node("robot_action_primitives")
+    rob_act_prim = RobotActionPrimitives()
+    rob_act_prim.find("cup")

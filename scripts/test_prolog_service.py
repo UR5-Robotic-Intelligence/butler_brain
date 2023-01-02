@@ -2,7 +2,7 @@
 
 import rospy
 from rosprolog_client import Prolog
-from owl_test.robot_activities import prepareADrink, prepareAMeal, bringObject
+from owl_test.robot_activities import RobotActivities
 from owl_test.utils import text_to_speech, text_to_keywords, speach_to_text, get_top_matching_candidate, cos_sim, write_embeddings
 from owl_test.ontology_utils import OntologyUtils
 import fuzzywuzzy.fuzz as fuzz
@@ -17,6 +17,7 @@ import pickle
 if __name__ == "__main__":
   rospy.init_node('test_rosprolog')
   ou = OntologyUtils()
+  ra = RobotActivities()
   prolog = ou.prolog
   ns = ou.ns
   args = argparse.ArgumentParser(description='Test the rosprolog service')
@@ -57,6 +58,7 @@ if __name__ == "__main__":
   # output_components = ['chocolate', 'milk']
   # output_components = ['tea', 'beverage']
   # output_components = ['drinking']
+  # output_components = ['coffee', 'shop']
   
   comp_enc = model.encode([component.lower() for component in output_components], device='cuda')
   
@@ -259,7 +261,7 @@ if __name__ == "__main__":
     if verbose:
       print("More than one candidate with the same number of votes, scoring candidates based on the similarity between the components of the candidate and the candidate name")
     for key, val in filtered_sorted_candidates:
-      val['score'] = sum(val['sim'])
+      val['score'] = sum(val['sim'])/len(val['sim'])
     filtered_sorted_candidates = sorted(filtered_sorted_candidates, key=lambda x: x[1]['score'], reverse=True)
 
     if verbose:
@@ -349,8 +351,8 @@ if __name__ == "__main__":
     query.finish()
   chosen_activity['objectActedOn'] = filtered_objects
   if chosen_activity['type'] == 'Drink':
-    prepareADrink(chosen_activity)
+    ra.prepareADrink(chosen_activity)
   elif chosen_activity['type'] == 'Food':
-    prepareAMeal(chosen_activity)
+    ra.prepareAMeal(chosen_activity)
   else:
-    bringObject(chosen_activity)
+    ra.bringObject(chosen_activity)

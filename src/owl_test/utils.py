@@ -49,6 +49,28 @@ v. prepare
 Q:Do you have some falafel?
 1. falafel\n"""
 
+text_to_keyword_prompt = """Q:Put lemon on water please:
+1. lemon
+2. water
+Q:Prepare a meal for dinner please:
+1. meal
+2. dinner
+Q:Make me orange juice please:
+1. orange
+2. juice
+Q:Pour me some water:
+1. water
+Q:Some lemonade will do wonders for me right now:
+1. lemonade
+Q:Life without meat is nothing:
+1.meat
+Q:I want to eat some burgers:
+1. burger\n
+Q:I would love it if you can prepare me a nice drink:
+1. drink
+Q:Do you have some falafel?
+1. falafel\n"""
+
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
