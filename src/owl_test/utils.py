@@ -5,6 +5,8 @@ from gtts import gTTS
 import openai
 import speech_recognition as sr
 import fuzzywuzzy.fuzz as fuzz
+from sentence_transformers import SentenceTransformer
+
 
 import re
 import sys
@@ -330,22 +332,31 @@ def text_to_keywords(text, verbose=False):
     print(response)
   return response["choices"][0]["text"]
 
-def get_top_matching_candidate(candidate_list, match_with_list):
+def get_top_matching_candidate(candidate_list, match_with_list, bert=False, bert_model=None, verbose=False):
   top_ratio = 0
   top_candidate_index = 0
   top_match_index = 0
   all_matches = []
+  candidate_list = list(candidate_list) if type(candidate_list) == list else [candidate_list]
+  match_with_list = list(match_with_list) if type(match_with_list) == list else [match_with_list]
+  if bert:
+    model = SentenceTransformer('bert-base-nli-mean-tokens') if bert_model is None else bert_model
   for i, candidate in enumerate(candidate_list):
     for j, match in enumerate(match_with_list):
       c, m = candidate.lower(), match.lower()
-      ratio = fuzz.ratio(c, m) + fuzz.partial_ratio(c, m)
-      ratio = ratio + 100*min(len(m), len(c)) if (c in m) or (m in c) else ratio
+      if bert:
+        c_enc, m_enc = model.encode([c])[0], model.encode([m])[0]
+        ratio = cos_sim(c_enc, m_enc)
+      else:
+        ratio = fuzz.ratio(c, m) + fuzz.partial_ratio(c, m)
+        ratio = ratio + 100*min(len(m), len(c)) if (c in m) or (m in c) else ratio
       all_matches.append((c, m, ratio))
       if ratio >= top_ratio:
           top_ratio = ratio
           top_candidate_index = i
           top_match_index = j
-  print(all_matches)
+  if verbose:
+    print(all_matches)
   return top_candidate_index, top_match_index, top_ratio
 
 def cos_sim(a, b):

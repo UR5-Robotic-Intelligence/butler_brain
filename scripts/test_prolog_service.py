@@ -306,7 +306,7 @@ if __name__ == "__main__":
       query = prolog.query(query_string)
       for solution in query.solutions():
         chosen_activity_name = solution["B"].split("#")[1]
-    activity_name, output_name = ou.handle_super_activity(chosen_activity_name, verbose=verbose)
+    activity_name, output_name = ou.handle_super_activity(chosen_activity_name, bert=True, bert_model=model, verbose=verbose)
     if activity_name is None:
       exit()
     if activity_name in sorted_candidates_dict.keys():

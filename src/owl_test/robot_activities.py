@@ -38,7 +38,9 @@ class RobotActivities:
       components_loc[component] = self.ab.find(component.lower())
       if components_loc[component] is None:
         text_to_speech("I don't see {}. Please bring me {}.".format(component, component), verbose=verbose)
-        self.ab.wait_for(component.lower(), verbose=verbose)
+        loc = self.ab.wait_for(component.lower(), verbose=verbose)
+        if loc is None:
+          continue
         components_loc[component] = self.ab.find(component.lower())
       # if sugar is one of the drink componets, ask how much sugar to put in.
       if component == "sugar":

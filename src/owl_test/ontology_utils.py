@@ -7,7 +7,7 @@ class OntologyUtils:
     self.prolog = Prolog()
     self.ns = "\"http://ias.cs.tum.edu/kb/knowrob.owl#"
 
-  def handle_super_activity(self, chosen_activity_name, verbose=True):
+  def handle_super_activity(self, chosen_activity_name, bert=False, bert_model=None, verbose=True):
     query_string = "subclass_of(B, " + self.ns + chosen_activity_name + "\")"
     query_string += ", is_restriction(A, some(" + self.ns + "outputsCreated\", C)), subclass_of(B, A), \\+((subclass_of(Sb, A), subclass_of(B, Sb)))"
     query = self.prolog.query(query_string)
@@ -25,13 +25,13 @@ class OntologyUtils:
     for i, candidate in enumerate(possible_outputs):
       text_to_speech("{}. {}".format(i+1, candidate), verbose=True)
     top_ratio = 0
-    ratio_threshold = 100
+    ratio_threshold = 100 if not bert else 0.1
     while top_ratio < ratio_threshold:
       input("Press enter to continue")
       choice_text = speach_to_text(verbose=verbose, show_all=True)
       if type(choice_text) == str:
         choice_text = [choice_text]
-      choice, _ , top_ratio = get_top_matching_candidate(possible_activities, choice_text)
+      choice, _ , top_ratio = get_top_matching_candidate(possible_activities, choice_text, bert=bert, bert_model=bert_model, verbose=verbose)
       if top_ratio < ratio_threshold:
         text_to_speech("I didn't understand. Please try again.", verbose=verbose)
     # choice = int(input(text_to_speech("Enter your choice: ", verbose=True)))
