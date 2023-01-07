@@ -41,22 +41,22 @@ if __name__ == "__main__":
   # output_of_gpt3 = input("Enter the output of GPT-3: ")
   # user_request = input("Enter your request: ")
   
-  text_to_speech("Press enter to start the test", verbose=verbose)
-  input()
-  text_to_speech("Please say your request:", verbose=verbose)
-  user_request = speach_to_text(verbose=verbose)
-  output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
-  if verbose:
-    print(output_of_gpt3)
-  output_components = output_of_gpt3.strip().split("\n")
-  if verbose:
-    print(output_components)
-  output_components = [x.split(".")[-1].strip() for x in output_components]
-  if verbose:
-    print(output_components)
+  # text_to_speech("Press enter to start the test", verbose=verbose)
+  # input()
+  # text_to_speech("Please say your request:", verbose=verbose)
+  # user_request = speach_to_text(verbose=verbose)
+  # output_of_gpt3 = text_to_keywords(user_request.strip(), verbose=verbose)
+  # if verbose:
+  #   print(output_of_gpt3)
+  # output_components = output_of_gpt3.strip().split("\n")
+  # if verbose:
+  #   print(output_components)
+  # output_components = [x.split(".")[-1].strip() for x in output_components]
+  # if verbose:
+  #   print(output_components)
   
   # output_components = ['chocolate', 'milk']
-  # output_components = ['tea', 'beverage']
+  output_components = ['tea', 'beverage']
   # output_components = ['drinking']
   # output_components = ['coffee', 'shop']
   
@@ -341,12 +341,14 @@ if __name__ == "__main__":
   
   # Perform the activities
   filtered_objects = []
+  # print("Objects are: ", chosen_activity['objectActedOn'])
   for obj in chosen_activity['objectActedOn']:
     t = "Drinking" if chosen_activity['type'] == "Drink" else chosen_activity['type']
     query_string = "subclass_of(" + ns + obj + "\", " + ns + t + "Ingredient" + "\")"
-    query_string += "; subclass_of(" + ns + obj + "\", " + ns + t + "Vessel" + "\")."
+    query_string += ";subclass_of(" + ns + obj + "\", " + ns + t + "Vessel" + "\")."
     query = prolog.query(query_string)
     for solution in query.solutions():
+      print(obj, " has sol ", solution)
       filtered_objects.append(obj)
     query.finish()
   chosen_activity['objectActedOn'] = filtered_objects
