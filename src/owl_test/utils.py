@@ -73,6 +73,37 @@ Q:I would love it if you can prepare me a nice drink:
 Q:Do you have some falafel?
 1. falafel\n"""
 
+text_to_keyword_prompt = """Q:{'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}
+steps:
+1. transport(tea-packet, drinking-mug)
+2. pour(water, drinking-mug)\n
+"""
+
+
+components_to_steps_prompt = f"""Q:Components for making a tea-beverage are:
+1. tea-packet : affords being diffused in water, being contained, being transported, is solid.
+2. water : affords being contained, diffusing, dissolving, drinking, pouring, soaking, boiling, and washing, is liquid.
+3. drinking-mug : affords containing, drinking, pouring, being transported, and washing, is solid.
+steps:
+1. transport(tea-packet, drinking-mug)
+2. pour(water, drinking-mug)
+Q:Components for making an egg-omlette are:
+1. eggs : affords being broken, cooking, eating, being fried, being boiled, is solid.
+2. oil : affords cooking, pouring, frying, being heated, being contained, is liquid.
+3. pan : affords containing, pouring, cooking, frying, heating, being transported, and washing, is solid.
+4. stove : affords cooking, heating, being turned-on, and being turned-off, is solid.
+steps:
+1. turn_on(stove)
+2. transport(pan, stove)
+3. pour(oil, pan)
+4. break(eggs, pan)
+5. wait(3, minutes)
+6. turn_off(stove)\n
+"""
+
+prompts = {'text_to_keyword': text_to_keyword_prompt,
+           'components_to_steps': components_to_steps_prompt}
+
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
@@ -319,9 +350,40 @@ def text_to_keywords(text, verbose=False):
   # print(text_to_keyword_prompt+text)
   response = openai.Completion.create(
     engine="code-cushman-001",
-    prompt=text_to_keyword_prompt+"Q:" + text + ":\n",
+    prompt=text_to_keyword_prompt+"Q:" + text + ":",
     temperature=0,
-    max_tokens=30,
+    max_tokens=70,
+    top_p=0.1,
+    n=1,
+    stream=False,
+    logprobs=None,
+    stop=["Q:"]
+  )
+  if verbose:
+    print(response)
+  return response["choices"][0]["text"]
+
+def get_activity_steps(activity_name, activity_components_dict, verbose=False):
+  # print(text_to_keyword_prompt+text)
+  prompt = f"""Q:Components for making a {activity_name} are:\n"""
+  comp_num = 1
+  for comp_name, comp_details in activity_components_dict.items():
+    if comp_details is not None:
+      prompt += f"""{str(comp_num)}.{comp_name}: """
+      for i, detail in enumerate(comp_details):
+        if i != len(comp_details)-1:
+          prompt += f"""{detail}, """
+        else:
+          prompt += f"""{detail}\n"""
+    else:
+      prompt += f"""{str(comp_num)}.{comp_name}\n"""
+    comp_num += 1
+  prompt += "Steps:"
+  response = openai.Completion.create(
+    engine="code-cushman-001",
+    prompt=components_to_steps_prompt + prompt,
+    temperature=0,
+    max_tokens=70,
     top_p=0.1,
     n=1,
     stream=False,
@@ -363,8 +425,45 @@ def cos_sim(a, b):
   return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
 
 if __name__ == '__main__':
+#   print(text_to_keywords("""Components for making a coffee-beverage are:
+# 1. coffee-powder : affords being diffused in water, being contained, being transported, is solid.
+# 2. water : affords being contained, diffusing, dissolving, drinking, pouring, soaking, and washing, is liquid.
+# 3. drinking-mug : affords containing, drinking, pouring, being transported, and washing, is solid.
+# 4. sugar-cube: affords being disolved in water, being contained, being transported, is solid.
+# steps""", verbose=True))
+  print(text_to_keywords("{'output': 'Coffee-Beverage', 'sim': [0.9146566], 'objectActedOn': ['CoffeeBeans', 'DrinkingMug', 'HotWater'], 'level': 'activity', 'components': ['coffee'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9146565794944763, 'name': 'MakingCoffee-TheBeverage', 'type': 'Drink', 'objects_details': {'CoffeeBeans': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'Granular')], 'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'HotWater': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}", verbose=True))
+  print(text_to_keywords("{'output': 'Juice', 'sim': [0.9999999], 'objectActedOn': ['DrinkingGlass'], 'level': 'activity', 'components': ['juice'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9999998807907104, 'name': 'MakingJuice', 'type': 'Drink', 'objects_details': {'DrinkingGlass': [('type', 'Class'), ('subClassOf', 'DrinkingVessel')]}}", verbose=True))
+  # res = get_activity_steps("coffee-beverage",
+  #                          {"coffee-powder": ["affords being diffused in water",
+  #                                             "being contained",
+  #                                             "being transported",
+  #                                             "is solid"],
+  #                           "water": ["affords being contained",
+  #                                     "diffusing",
+  #                                     "dissolving",
+  #                                     "drinking",
+  #                                     "pouring",
+  #                                     "soaking",
+  #                                     "washing",
+  #                                     "is liquid"],
+  #                           "drinking-mug": ["affords containing",
+  #                                            "drinking", "pouring",
+  #                                            "being transported",
+  #                                            "washing",
+  #                                            "is solid"],
+  #                           "sugar-cube": ["affords being disolved in water",
+  #                                          "being contained",
+  #                                          "being transported",
+  #                                          "is solid"]}, verbose=True)
+  # output_of_gpt3 = res.strip().strip().split("\n")
+  # for i, step in enumerate(output_of_gpt3):
+  #   step = step.split(".")[-1]
+  #   func_name = step.split("(")[0]
+  #   input_args = step.split("(")[1].split(")")[0].split(",")
+  #   input_args = [arg.strip() for arg in input_args]
+  #   print(func_name, input_args)
   # print(text_to_keywords("Q:Prepare a meal for dinner please:\n", verbose=True))
-  speach_to_text()
+  # speach_to_text()
   # speach_to_text_()
   # data = {'alternative': [{'transcript': 't', 'confidence': 0.29859412}, {'transcript': 'tea'}, {'transcript': 'teeth'}, {'transcript': 'tee'}], 'final': True}
   # candidates = [val['transcript'] for val in data['alternative']]

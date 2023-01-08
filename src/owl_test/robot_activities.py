@@ -57,24 +57,19 @@ class RobotActivities:
           text_to_speech("I don't have enough sugar. Please bring me more sugar.", verbose=verbose)
           components_loc["sugar"] = self.ap.find("sugar")
         for i in range(1, n_sugar):
-          # self.ap.pick(component, components_loc["sugar"][component+str(i)])
-          # self.ap.place(cup_name, cup_loc)
           self.transport_object(component, cup_name,
                                 object_loc=components_loc["sugar"][component+str(i)], serve_loc=cup_loc, verbose=verbose)
       # elif component['type'] != "liquid":
       else:
-        # self.ap.pick(component, components_loc[component][component+'1'])
-        # rospy.sleep(1.0)
-        # self.ap.place(cup_name, cup_loc)
         self.transport_object(component, cup_name,
                               object_loc=components_loc[component][component+'1'], serve_loc=cup_loc, verbose=verbose)
     
-    while False:
+    while True:
       text_to_speech("Please tell me where to serve the drink.", verbose=verbose)
       txt = speach_to_text(verbose=verbose)
-      top_candidate_index, top_match_index, top_ratio = get_top_matching_candidate(txt, self.serving_places, verbose=verbose)
+      top_candidate_index, top_match_index, top_ratio = get_top_matching_candidate(txt, self.serving_places, bert=True, verbose=verbose)
       print("top_candidate_index: {}, top_match_index: {}, top_ratio: {}".format(top_candidate_index, top_match_index, top_ratio))
-      if top_ratio < 0.99:
+      if top_ratio < 0.9:
         # TODO: add a a wat for user to show the location to the robot.
         text_to_speech("Please tell me a plausible location to serve the drink.", verbose=verbose)
         to_say = "Currently, I can serve the drink to "
@@ -92,7 +87,7 @@ class RobotActivities:
         txt = speach_to_text(verbose=verbose)
       if txt == "yes":
         break
-    top_match_index = 0
+    # top_match_index = 0
     serve_to = self.serving_places[top_match_index]
     self.transport_object("cup", serve_to, object_loc=cup_loc,
                           verbose=verbose, touch=True, constraints_name="drink_serving_constraints",

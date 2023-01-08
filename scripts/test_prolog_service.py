@@ -17,7 +17,7 @@ import pickle
 if __name__ == "__main__":
   rospy.init_node('test_rosprolog')
   ou = OntologyUtils()
-  ra = RobotActivities()
+  # ra = RobotActivities()
   prolog = ou.prolog
   ns = ou.ns
   args = argparse.ArgumentParser(description='Test the rosprolog service')
@@ -55,10 +55,11 @@ if __name__ == "__main__":
   # if verbose:
   #   print(output_components)
   
-  # output_components = ['chocolate', 'milk']
-  output_components = ['tea', 'beverage']
+  output_components = ['chocolate', 'milk']
+  # output_components = ['tea', 'beverage']
   # output_components = ['drinking']
   # output_components = ['coffee', 'shop']
+  # output_components = ['juice']
   
   comp_enc = model.encode([component.lower() for component in output_components], device='cuda')
   
@@ -352,9 +353,19 @@ if __name__ == "__main__":
       filtered_objects.append(obj)
     query.finish()
   chosen_activity['objectActedOn'] = filtered_objects
-  if chosen_activity['type'] == 'Drink':
-    ra.prepareADrink(chosen_activity)
-  elif chosen_activity['type'] == 'Food':
-    ra.prepareAMeal(chosen_activity)
-  else:
-    ra.bringObject(chosen_activity)
+  chosen_activity['objects_details'] = {}
+  for obj in chosen_activity['objectActedOn']:
+    chosen_activity['objects_details'][obj] = []
+    query_string = "holds(" + ns + obj + "\", A, B)."
+    query = prolog.query(query_string)
+    for solution in query.solutions():
+        if "Description" not in solution["B"]:
+          chosen_activity['objects_details'][obj].append((solution["A"].split('#')[-1], solution["B"].split('#')[-1]))
+  print("chosen activity is: ", chosen_activity)
+  # ra.gptActivity(chosen_activity)
+  # if chosen_activity['type'] == 'Drink':
+  #   ra.prepareADrink(chosen_activity)
+  # elif chosen_activity['type'] == 'Food':
+  #   ra.prepareAMeal(chosen_activity)
+  # else:
+  #   ra.bringObject(chosen_activity)
