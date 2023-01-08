@@ -11,13 +11,14 @@ from sentence_transformers import SentenceTransformer
 import re
 import sys
 
-from google.cloud import speech
+from google.cloud import speech, texttospeech
 
 import pyaudio
 from six.moves import queue
 
 import numpy as np
 from tqdm import tqdm
+from copy import deepcopy
 
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
@@ -71,13 +72,33 @@ Q:I want to eat some burgers:
 Q:I would love it if you can prepare me a nice drink:
 1. drink
 Q:Do you have some falafel?
-1. falafel\n"""
+1. falafel
+Q:Make me chocolate cake:
+1.chocolate-cake
+Q:Make me a meat burger:
+1.meat-burger
+Q:Make me some rice with salad:
+1.rice
+2.salad
+Q:Prepare me a tuna sandwich with some tomato
+1.tuna-sandwich
+2-tomato
+Q:Make me a cup of lemonade
+1.cup
+2.lemonade
+Q:Prepare me a big rice plate
+1.rice
+2.plate\n"""
 
-text_to_keyword_prompt = """Q:{'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}
-steps:
-1. transport(tea-packet, drinking-mug)
-2. pour(water, drinking-mug)\n
+text_to_ont_dict = """Q:you put tea packet in a cup and then you put water in the cup:
+
 """
+
+# text_to_keyword_prompt = """Q:{'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}
+# steps:
+# 1. transport(tea-packet, drinking-mug)
+# 2. pour(water, drinking-mug)\n
+# """
 
 
 components_to_steps_prompt = f"""Q:Components for making a tea-beverage are:
@@ -338,13 +359,45 @@ def speach_to_text_(verbose=True, show_all=False):
       if verbose:
         print("unknown error occurred")
 
-def text_to_speech(text, filename="test.mp3", verbose=False):
+def text_to_speech_(text, filename="test.mp3", verbose=False):
   if verbose:
     print(text)
   tts = gTTS(text=text, lang='en', slow=False,)
   tts.save(filename)
   os.system("mpg321 -q " + filename)
   os.system("rm " + filename)
+
+def text_to_speech(text, verbose=False):
+    """Synthesizes speech from the input string of text."""
+    if verbose:
+      print(text)
+    client = texttospeech.TextToSpeechClient()
+
+    input_text = texttospeech.SynthesisInput(text=text)
+
+    # Note: the voice can also be specified by name.
+    # Names of voices can be retrieved with client.list_voices().
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="en-US",
+        name="en-US-Standard-E",
+        ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+    )
+
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        volume_gain_db=6.0,
+    )
+
+    response = client.synthesize_speech(
+        request={"input": input_text, "voice": voice, "audio_config": audio_config}
+    )
+
+    # The response's audio_content is binary.
+    with open("output.mp3", "wb") as out:
+        out.write(response.audio_content)
+        # print('Audio content written to file "output.mp3"')
+        os.system("mpg321 -q " + "output.mp3")
+        os.system("rm " + "output.mp3")
   
 def text_to_keywords(text, verbose=False):
   # print(text_to_keyword_prompt+text)
@@ -405,7 +458,20 @@ def get_top_matching_candidate(candidate_list, match_with_list, bert=False, bert
     model = SentenceTransformer('bert-base-nli-mean-tokens') if bert_model is None else bert_model
   for i, candidate in enumerate(candidate_list):
     for j, match in enumerate(match_with_list):
-      c, m = candidate.lower(), match.lower()
+      c_m = [candidate, match]
+      new_c_m = []
+      for sent in c_m:
+        sent = re.sub( r"([A-Z])", r" \1", sent).split()
+        for i, word in enumerate(sent):
+          if word in [' ', '-', '_']:
+            sent.remove(word)
+          else:
+            sent[i] = word.strip('-')
+        sent = " ".join(sent)
+        sent = sent.lower()
+        new_c_m.append(sent)
+      c, m = new_c_m[0], new_c_m[1]
+      # c, m = candidate.lower(), match.lower()
       if bert:
         c_enc, m_enc = model.encode([c])[0], model.encode([m])[0]
         ratio = cos_sim(c_enc, m_enc)
