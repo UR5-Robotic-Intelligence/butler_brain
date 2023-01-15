@@ -12,6 +12,7 @@ class OntologyUtils:
     query_string += ", is_restriction(A, some(" + self.ns + "outputsCreated\", C)), subclass_of(B, A), \\+((subclass_of(Sb, A), subclass_of(B, Sb)))"
     query = self.prolog.query(query_string)
     possible_activities = []
+    
     possible_outputs = []
     for solution in query.solutions():
       possible_activities.append(solution['B'].split('#')[-1])

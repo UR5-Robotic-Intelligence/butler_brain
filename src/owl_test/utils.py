@@ -19,6 +19,8 @@ from six.moves import queue
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
+import time
+import rospy
 
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
@@ -90,15 +92,43 @@ Q:Prepare me a big rice plate
 1.rice
 2.plate\n"""
 
-text_to_ont_dict = """Q:you put tea packet in a cup and then you put water in the cup:
-
+text_to_commands = """Q:you put tea packet in a cup and then you put water in the cup:
+1. transport(tea-packet, cup)
+2. pour(water, cup)
+container(cup)
+Q: First put cheese on the breat, then put in the oven to heat it up for a few minutes, then take it out of the oven and enjoy:
+1. transport(cheese, pizza)
+2. transport(pizza, oven)
+container(oven)
+Q: put oats in a bowl, add milk, add honey, mix it all together, and enjoy:
+1. transport(oats, bowl)
+2. pour(milk, bowl)
+3. pour(honey, bowl)
+container(bowl)\n
 """
 
-# text_to_keyword_prompt = """Q:{'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}
-# steps:
-# 1. transport(tea-packet, drinking-mug)
-# 2. pour(water, drinking-mug)\n
+# text_to_commands = """Q:you put tea packet in a cup and then you put water in the cup:
+# 1. tea-packet
+# 2. water
+# 3. cup
+# Q: First put cheese on the bread, then put in the oven to heat it up for a few minutes, then take it out of the oven and enjoy:
+# 1. cheese
+# 2. bread
+# 3.
+# Q: put oats in a bowl, add milk, add honey, mix it all together, and enjoy:
+# 1. transport(oats, bowl)
+# 2. pour(milk, bowl)
+# 3. pour(honey, bowl)
 # """
+
+ont_to_commands = """Q: {'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}:
+1. transport(tea-packet, drinking-mug)
+2. pour(water, drinking-mug)
+container(drinking-mug)
+Q:{'output': 'Juice', 'sim': [0.9999999], 'objectActedOn': ['DrinkingGlass', 'Juice'], 'level': 'activity', 'components': ['juice'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9999998807907104, 'name': 'MakingJuice', 'type': 'Drink', 'objects_details': {'DrinkingGlass': [('type', 'Class'), ('subClassOf', 'DrinkingVessel')]}}:
+1. pour(juice, drinking-glass)
+container(drinking-glass)\n
+"""
 
 
 components_to_steps_prompt = f"""Q:Components for making a tea-beverage are:
@@ -122,7 +152,9 @@ steps:
 6. turn_off(stove)\n
 """
 
-prompts = {'text_to_keyword': text_to_keyword_prompt,
+prompts = {'text_to_keywords': text_to_keyword_prompt,
+           'text_to_commands': text_to_commands,
+           'ont_to_commands': ont_to_commands,
            'components_to_steps': components_to_steps_prompt}
 
 # Audio recording parameters
@@ -266,7 +298,7 @@ def listen_print_loop(responses):
             num_chars_printed = 0
 
 
-def speach_to_text(verbose=True, show_all=False): # under development
+def speach_to_text(verbose=True, show_all=False, stop_cond=None): # under development
     # See http://g.co/cloud/speech/docs/languages
     # for a list of supported languages.
     language_code = "en-US"  # a BCP-47 language tag
@@ -281,7 +313,10 @@ def speach_to_text(verbose=True, show_all=False): # under development
     streaming_config = speech.StreamingRecognitionConfig(
         config=config, interim_results=True
     )
-    while(1):   
+    if stop_cond is None:
+      stop_cond = lambda : True
+    while(stop_cond()):
+      print("s2t stop cond = ", stop_cond())
       # Exception handling to handle
       # exceptions at the runtime
       try:
@@ -396,14 +431,39 @@ def text_to_speech(text, verbose=False):
     with open("output.mp3", "wb") as out:
         out.write(response.audio_content)
         # print('Audio content written to file "output.mp3"')
-        os.system("mpg321 -q " + "output.mp3")
-        os.system("rm " + "output.mp3")
+    os.system("mpg321 -q " + "output.mp3")
+    os.system("rm " + "output.mp3")
   
-def text_to_keywords(text, verbose=False):
+def tell_me_one_of(question, answers=['yes', 'no'], verbose=False, loop_stop_cond=None):
+  answers = [ans.lower() for ans in answers]
+  # if verbose:
+  #   print(question)
+  if loop_stop_cond is None:
+    loop_stop_cond = lambda: True
+    
+  if type(loop_stop_cond) is int:
+    start_time = time.time()
+    wait_time = loop_stop_cond
+    loop_stop_cond = lambda: not((time.time() - start_time < wait_time) and (not rospy.is_shutdown()))
+  text_to_speech(question, verbose=verbose)
+  while not rospy.is_shutdown():
+    txt = speach_to_text(verbose=verbose)
+    if txt is None:
+      continue
+    for answer in answers:
+      if answer in txt:
+        if verbose:
+          print(answer)
+        return answer
+    txt = "I didn't get that, please tell me one of the following: " + str(answers)
+    text_to_speech(txt, verbose=verbose)
+  
+def gpt(text, prompt_to_use='text_to_keywords', verbose=False):
   # print(text_to_keyword_prompt+text)
+  prompt = prompts[prompt_to_use]
   response = openai.Completion.create(
     engine="code-cushman-001",
-    prompt=text_to_keyword_prompt+"Q:" + text + ":",
+    prompt=prompt+"Q:" + text + ":",
     temperature=0,
     max_tokens=70,
     top_p=0.1,
@@ -447,7 +507,7 @@ def get_activity_steps(activity_name, activity_components_dict, verbose=False):
     print(response)
   return response["choices"][0]["text"]
 
-def get_top_matching_candidate(candidate_list, match_with_list, bert=False, bert_model=None, verbose=False):
+def get_top_matching_candidate(candidate_list, match_with_list, bert=False, bert_model=None, verbose=False, sentence=False):
   top_ratio = 0
   top_candidate_index = 0
   top_match_index = 0
@@ -462,11 +522,11 @@ def get_top_matching_candidate(candidate_list, match_with_list, bert=False, bert
       new_c_m = []
       for sent in c_m:
         sent = re.sub( r"([A-Z])", r" \1", sent).split()
-        for i, word in enumerate(sent):
+        for w_idx, word in enumerate(sent):
           if word in [' ', '-', '_']:
             sent.remove(word)
           else:
-            sent[i] = word.strip('-')
+            sent[w_idx] = word.strip('-').replace('-', ' ')
         sent = " ".join(sent)
         sent = sent.lower()
         new_c_m.append(sent)
@@ -491,14 +551,14 @@ def cos_sim(a, b):
   return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
 
 if __name__ == '__main__':
-#   print(text_to_keywords("""Components for making a coffee-beverage are:
+#   print(gpt("""Components for making a coffee-beverage are:
 # 1. coffee-powder : affords being diffused in water, being contained, being transported, is solid.
 # 2. water : affords being contained, diffusing, dissolving, drinking, pouring, soaking, and washing, is liquid.
 # 3. drinking-mug : affords containing, drinking, pouring, being transported, and washing, is solid.
 # 4. sugar-cube: affords being disolved in water, being contained, being transported, is solid.
 # steps""", verbose=True))
-  print(text_to_keywords("{'output': 'Coffee-Beverage', 'sim': [0.9146566], 'objectActedOn': ['CoffeeBeans', 'DrinkingMug', 'HotWater'], 'level': 'activity', 'components': ['coffee'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9146565794944763, 'name': 'MakingCoffee-TheBeverage', 'type': 'Drink', 'objects_details': {'CoffeeBeans': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'Granular')], 'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'HotWater': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}", verbose=True))
-  print(text_to_keywords("{'output': 'Juice', 'sim': [0.9999999], 'objectActedOn': ['DrinkingGlass'], 'level': 'activity', 'components': ['juice'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9999998807907104, 'name': 'MakingJuice', 'type': 'Drink', 'objects_details': {'DrinkingGlass': [('type', 'Class'), ('subClassOf', 'DrinkingVessel')]}}", verbose=True))
+  # print(gpt("{'output': 'Coffee-Beverage', 'sim': [0.9146566], 'objectActedOn': ['CoffeeBeans', 'DrinkingMug', 'HotWater'], 'level': 'activity', 'components': ['coffee'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9146565794944763, 'name': 'MakingCoffee-TheBeverage', 'type': 'Drink', 'objects_details': {'CoffeeBeans': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'Granular')], 'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'HotWater': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}", verbose=True))
+  # print(gpt("{'output': 'Juice', 'sim': [0.9999999], 'objectActedOn': ['DrinkingGlass'], 'level': 'activity', 'components': ['juice'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9999998807907104, 'name': 'MakingJuice', 'type': 'Drink', 'objects_details': {'DrinkingGlass': [('type', 'Class'), ('subClassOf', 'DrinkingVessel')]}}", verbose=True))
   # res = get_activity_steps("coffee-beverage",
   #                          {"coffee-powder": ["affords being diffused in water",
   #                                             "being contained",
@@ -522,13 +582,36 @@ if __name__ == '__main__':
   #                                          "being transported",
   #                                          "is solid"]}, verbose=True)
   # output_of_gpt3 = res.strip().strip().split("\n")
+  gpt_string = gpt("{output': 'Tomatojuice', 'objectActedOn': ['tomato', 'cup', 'water', 'cup'], 'level': 'activity', 'type': 'Drink', 'container': 'cup', 'description': 'first put tomato in the cup and then pour water into the cup', 'components': ['in'], 'votes': 1, 'sim': [0.83004594], 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'objects_details': {'tomato': [], 'cup': [], 'water': []}}", prompt_to_use='ont_to_commands', verbose=True)
+  print(gpt_string)
+  gpt_string = gpt_string.strip().strip().split("\n")
+  container = gpt_string[-1][10:-1]
+  output_components = []
+  rob_commands = []
+  for i, step in enumerate(gpt_string):
+    if i == len(gpt_string) - 1:
+      break
+    step = step.split(".")[-1]
+    func_name = step.split("(")[0]
+    input_args = step.split("(")[1].split(")")[0].split(",")
+    input_args = [arg.strip() for arg in input_args]
+    output_components.extend(input_args)
+    rob_commands.append(input_args)
+  print(rob_commands)
+  # res = gpt("put tomato in cup, then pour water in cup", to_ont=True, verbose=True)
+  # output_of_gpt3 = res.strip().strip().split("\n")
+  # container = None
   # for i, step in enumerate(output_of_gpt3):
+  #   if i == len(output_of_gpt3) - 1:
+  #     container = step[10:-1]
+  #     break
   #   step = step.split(".")[-1]
   #   func_name = step.split("(")[0]
   #   input_args = step.split("(")[1].split(")")[0].split(",")
   #   input_args = [arg.strip() for arg in input_args]
   #   print(func_name, input_args)
-  # print(text_to_keywords("Q:Prepare a meal for dinner please:\n", verbose=True))
+  # print(container)
+  # print(gpt("Q:Prepare a meal for dinner please:\n", verbose=True))
   # speach_to_text()
   # speach_to_text_()
   # data = {'alternative': [{'transcript': 't', 'confidence': 0.29859412}, {'transcript': 'tea'}, {'transcript': 'teeth'}, {'transcript': 'tee'}], 'final': True}
