@@ -14,7 +14,18 @@ gTTs (google text to speech) -> pip install gTTS
 pyyaml -> pip install pyyaml
 rospkg -> pip install rospkg
 pyaudio -> sudo apt-get install portaudio19-dev && pip install pyaudio
+pip install --upgrade google-cloud-speech
+pip install SpeechRecognition
+pip install google-cloud-texttospeech
+pip install torchtext
 rosprolog
 knowrob
 mpg321 -> sudo apt install mpg321
 ```
+# Google Cloud API
+
+https://cloud.google.com/docs/authentication/provide-credentials-adc
+
+get sevice account key json file and add its path to bashrc:
+
+export GOOGLE_APPLICATION_CREDENTIALS="path/to/json"
