@@ -29,3 +29,15 @@ https://cloud.google.com/docs/authentication/provide-credentials-adc
 get sevice account key json file and add its path to bashrc:
 
 export GOOGLE_APPLICATION_CREDENTIALS="path/to/json"
+
+# Usage
+
+Replace knowrob.owl in the knowrob package with the knowrob.owl found in this package's owl folder
+```
+sudo systemctl start mongodb.service
+roslaunch rosprolog rosprolog.launch initial_package=knowrob
+```
+## In a new terminal:
+```
+rosrun owl_test test_prolog_service.py
+```
