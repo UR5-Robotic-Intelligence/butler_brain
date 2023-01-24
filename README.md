@@ -2,6 +2,9 @@
 
 A Repo to test using ontologies like knowrob with deeplearning in robotics.
 
+[Demonstration Video](https://youtube.com/playlist?list=PLKYWqKMe8hVKP9UAvhe-WZa0OisrNtL-v)
+
+
 # Dependencies
 
 ```
