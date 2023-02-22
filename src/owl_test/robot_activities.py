@@ -4,11 +4,10 @@ from owl_test.robot_action_primitives import RobotActionPrimitives
 from owl_test.utils import text_to_speech, speach_to_text, get_top_matching_candidate, tell_me_one_of
 import rospy
 import re
-from std_msgs.msg import Float64, Empty
+from std_msgs.msg import Empty
 from geometry_msgs.msg import PoseArray
 import numpy as np
 from std_srvs.srv import Empty as EmptySrv
-from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from socket import socket, AF_INET, SOCK_DGRAM
 
 
@@ -44,7 +43,10 @@ class RobotActivities:
     components_loc = {}
     skip = False
     for c in range(len(components)):
-      comp1 , comp2 = components[c][0], components[c][1]
+      func_name, comp1 , comp2 = components[c][0], components[c][1]
+      if func_name not in ['transport', 'pour', 'add', 'mix']:
+        text_to_speech("Currenty, I don't know how to do the action {}".format(func_name), verbose=verbose)
+        return
       comps = [comp1, comp2]
       print("components are comp1: ", comp1, "comp2: ", comp2)
       for i, component in enumerate(comps):
@@ -100,18 +102,6 @@ class RobotActivities:
             container_loc = list(min_component.values())[0]
           components_loc[component] = min_component
           print("min_component: ", min_component)
-        # if sugar is one of the drink componets, ask how much sugar to put in.
-        # if component == "sugar":
-        #   text_to_speech("How much sugar do you want?", verbose=verbose)
-        #   n_sugar = int(input("Enter the number of sugar cubes: "))
-        #   # if there's not enough sugar, ask for more sugar.
-        #   if len(components_loc["sugar"]) < n_sugar:
-        #     text_to_speech("I don't have enough sugar. Please bring me more sugar.", verbose=verbose)
-        #     components_loc["sugar"] = self.ap.find("sugar")
-        #   for i in range(1, n_sugar):
-        #     self.transport_object(component, cup_name,
-        #                           object_loc=components_loc["sugar"][component+str(i)], serve_loc=cup_loc, verbose=verbose)
-      # elif component['type'] != "liquid":
       if skip:
         continue
       self.transport_object(comps[0], comps[1],
@@ -150,15 +140,6 @@ class RobotActivities:
     self.mySocket.sendto(bytes('Drink Served', 'utf-8'),(self.SERVER_IP, self.PORT_NUMBER))
     
     return
-    # if there's a liquid component, pour it into the cup.
-    for component in components:
-      if component['type'] == "liquid": # TODO: check if it is a liquid using the ontology
-        # pour water from the kettle into the cup.
-        pour_from_loc = self.ap.find("bottle")
-        if 'temperature' in activity.keys():
-          if activity['temperature'] == "hot":
-            pour_from_loc = self.ap.find("kettle")
-        self.ap.pour(pour_from_loc, cup_loc)
   
   def transport_object(self, object_name, serve_to,
                        object_loc=None, serve_loc=None,
@@ -200,13 +181,6 @@ class RobotActivities:
       rospy.sleep(1.0)
     if go_home or (object_name == "bottle"):
       self.ap.ba.move_to_named_location("home")
-
-
-  def prepareAMeal(self, meal_activity, container='bowl', verbose=True):
-    pass
-  
-  def prepareGeneric(self, generic_activity, container, verbose=True):
-    text_to_speech("Preparing an activity named {}".format(generic_activity['name']),verbose=verbose)
     
 
 if __name__ == '__main__':

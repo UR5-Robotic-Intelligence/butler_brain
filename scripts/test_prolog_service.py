@@ -4,13 +4,11 @@ import rospy
 from owl_test.robot_activities import RobotActivities
 from owl_test.utils import text_to_speech, gpt, speach_to_text, get_top_matching_candidate, cos_sim, write_embeddings, tell_me_one_of
 from owl_test.ontology_utils import OntologyUtils
-import fuzzywuzzy.fuzz as fuzz
 import argparse
 import os
 from sentence_transformers import SentenceTransformer
 import torchtext.vocab as vocab
 import torch
-import time
 import pickle
 from copy import deepcopy
 from std_msgs.msg import String
@@ -38,14 +36,15 @@ class ButlerBrain():
     self.save_activites = args.parse_args().save_activites
     load_manip_data = args.parse_args().load_manip_data
     save_manip_data = args.parse_args().save_manip_data
+    # self.ra = RobotActivities(load_data=load_manip_data, save_data=save_manip_data, verbose=self.verbose)
     ou = OntologyUtils()
-    self.ra = RobotActivities(load_data=load_manip_data, save_data=save_manip_data, verbose=self.verbose)
     self.prolog = ou.prolog
     self.ns = ou.ns
     self.model = SentenceTransformer('bert-base-nli-mean-tokens')
     self.data_path = os.path.join(os.getcwd(), 'uji_butler_wokring_memory.txt')
     self.query_results_path = os.path.join(os.getcwd(), 'query_results.pkl')
     self.new_activities_path = os.path.join(os.getcwd(), 'new_activities.pkl')
+    self.new_prompts_path = os.path.join(os.getcwd(), 'new_prompts.txt')
     self.new_activities = {}
     if self.load_query_results:
       with open(self.query_results_path, 'rb') as f:
@@ -58,26 +57,44 @@ class ButlerBrain():
   
   def sign_command_callback(self, msg):
     self.sign_command = msg.data
-  
-  def gpt_string_commands_to_list(self, gpt_string, return_components=False):
+    
+  def gpt_string_commands_to_list(self, gpt_string, return_components=False, use_gpt_string=True):
     gpt_string = gpt_string.strip().strip().split("\n")
+    print("gpt_string: ", gpt_string)    
     container = gpt_string[-1][10:-1]
     output_components = []
     rob_commands = []
+    steps = []
     for i, step in enumerate(gpt_string):
       if i == len(gpt_string) - 1:
         break
-      step = step.split(".")[-1]
-      func_name = step.split("(")[0]
-      input_args = step.split("(")[1].split(")")[0].split(",")
-      input_args = [arg.strip() for arg in input_args]
+      
+      if not use_gpt_string:
+        func_name = step.split(" to ")[0].split(" ")[0]
+        input_args = [step.split(" to ")[0].split(" ")[1].strip()]
+        input_args.append(step.split(" to ")[1].strip())
+      else:
+        step = step.split(".")[-1].strip()
+        func_name = step.split("(")[0]
+        input_args = step.split("(")[1].split(")")[0].split(",")
+        input_args = [arg.strip() for arg in input_args]
+        if len(input_args) == 2 and input_args[1] == container:
+          # if func_name == "transport" and input_args[0] == 'water':
+          #   func_name = "pour"
+          # elif func_name == "pour" and input_args[0] not in  ['water', 'juice']:
+          #   func_name = "transport"
+          steps.append(f"{func_name} {input_args[0]} to {input_args[1]}")
+        elif len(input_args) == 1:
+          steps.append(f"{func_name} {input_args[0]}")
       output_components.extend(input_args)
-      rob_commands.append(input_args)
+      rob_commands.append((func_name, input_args[0], input_args[1]))
+      print(func_name, input_args)
+    print(container)
     if return_components:
-      return rob_commands, output_components
+      return rob_commands, output_components, container, steps, func_name
     return rob_commands
   
-  def add_new_activity(self):
+  def add_new_activity(self, predict=False, top_activities=None):
     text_to_speech("Please tell me the output created from the new activity, to add it to my knowledge",verbose=self.verbose)
     output_name = speach_to_text(verbose=self.verbose).capitalize().split()
     output_name = "".join(output_name)
@@ -91,49 +108,26 @@ class ButlerBrain():
         text_to_speech("I didn't get it, is it a Food or a Drink?",verbose=self.verbose)
       else:
         break
-    text_to_speech("Please describe how is the activity performed",verbose=self.verbose)
-    act_description = speach_to_text(verbose=self.verbose)
-    # output_of_gpt3 = gpt(act_description.strip(), verbose=self.verbose)
-    # if self.verbose:
-    #   print(output_of_gpt3)
-    # output_components = output_of_gpt3.strip().split("\n")
-    # if self.verbose:
-    #   print(output_components)
-    # output_components = [x.split(".")[-1].strip() for x in output_components]
-    # print(output_components)
-    res = gpt(act_description, prompt_to_use='text_to_commands', verbose=self.verbose)
-    output_of_gpt3 = res.strip().strip().split("\n")
-    container = output_of_gpt3[-1][10:-1]
+    if not predict:
+      text_to_speech("Please describe how is the activity performed",verbose=self.verbose)
+      act_description = speach_to_text(verbose=self.verbose)
+      additional_prompts = ""
+      for act_name, act in self.new_activities.items():
+        if 'prompt' in act:
+          if act['type'] == type_txt:
+            additional_prompts += "\n".join(act['prompt'])
+      res = gpt(act_description, prompt_to_use=f'text_to_commands_{type_txt.lower()}',new_prompt=additional_prompts, verbose=self.verbose)
+    else:
+      res = gpt()
     output_components = []
     steps = []
     rob_commands = []
     # TODO: 1.container should be one of objects acted on, and logical reasoning should handle its addition and ignorance,
     #       2.logical reasoning should handle the problem of transport and pour,
-    #       3.if one of the objects is not in knowledge base, robot should ask user to describe these objects,
-    #         and maybe also make the user answer some specific questions about the object (e.g. material type liquid or solid)
     #       4.also the func_name needs to be checked for existence as a capability, if not, find a way to automatically define it,
     #         and ask user for any missing or needed information.
     #       5.Find how to add these to the ontology. (would help in the reasoning)
-    #       6.What is the reasoning and how to use it?????
-    for i, step in enumerate(output_of_gpt3):
-      if i == len(output_of_gpt3) - 1:
-        break
-      step = step.split(".")[-1]
-      func_name = step.split("(")[0]
-      input_args = step.split("(")[1].split(")")[0].split(",")
-      input_args = [arg.strip() for arg in input_args]
-      output_components.extend(input_args)
-      rob_commands.append(input_args)
-      if len(input_args) == 2 and input_args[1] == container:
-        if func_name == "transport" and input_args[0] == 'water':
-          func_name = "pour"
-        elif func_name == "pour" and input_args[0] not in  ['water', 'juice']:
-          func_name = "transport"
-        steps.append(f"{func_name} {input_args[0]} to {input_args[1]}")
-      elif len(input_args) == 1:
-        steps.append(f"{func_name} {input_args[0]}")
-      print(func_name, input_args)
-    print(container)
+    rob_commands, output_components, container, steps, func_name = self.gpt_string_commands_to_list(res, return_components=True)
     output_components = list(set(output_components))
     text_to_speech(f"To make {output_name} I will give the robot the following commands:", verbose=self.verbose)
     for i, step in enumerate(steps):
@@ -143,16 +137,30 @@ class ButlerBrain():
         text_to_speech(step, verbose=self.verbose)
     text_to_speech("Is this correct?, please tell me yes or no", verbose=self.verbose)
     txt = speach_to_text(verbose=self.verbose)
+    new_rob_commands = None
     if 'no' in txt.lower():
-      text_to_speech("Ok, I will save these steps for you to correct it later", verbose=self.verbose)
-      return
+      text_to_speech("Ok, please correct the steps shown on the screen", verbose=self.verbose)
+      with open("steps_tmp.txt", "a") as file_object:
+          file_object.writelines("\n".join(steps))
+          file_object.write(f"\ncontainer({container})")
+      os.system("gedit steps_tmp.txt")
+      with open("steps_tmp.txt", "r") as file_object:
+          steps = file_object.readlines()
+          if self.verbose:
+            print("steps are ", steps)
+          new_rob_commands = self.gpt_string_commands_to_list("".join(steps), use_gpt_string=False)
     elif 'yes' in txt.lower():
       text_to_speech("Ok, I will do it right away", verbose=self.verbose)
+      new_rob_commands = rob_commands
+    new_prompt = ['Q:'+act_description+':']
+    new_prompt.extend([f"{i+1}. {f}({arg1},{arg2})" for i, (f, arg1, arg2) in enumerate(new_rob_commands)])
+    new_prompt.append(f"container({container})")
+    print(new_prompt)
     sup_act = 'PreparingABeverage' if type_txt == 'Drink' else 'PreparingAFoodItem'
     self.new_activities[act_name] = {'name':act_name,
                                      'output':output_name,
                                        'objectActedOn':output_components,
-                                       'steps':rob_commands,
+                                       'steps':new_rob_commands,
                                          'level':'activity',
                                            'type':type_txt,
                                            'container':container,
@@ -161,7 +169,8 @@ class ButlerBrain():
                                            'votes':0,
                                            'sim':[],
                                            'super_activities':[sup_act],
-                                           'super_objects':[type_txt]}
+                                           'super_objects':[type_txt],
+                                           'prompt':new_prompt}
     if self.save_activites:
       with open(self.new_activities_path, 'wb') as f:
         pickle.dump(self.new_activities, f)
@@ -179,7 +188,12 @@ class ButlerBrain():
     print("chosen activity is: ", chosen_activity)
     if 'steps' not in list(chosen_activity.keys()):
       chosen_activity['steps'] = []
-      commands_string = gpt(str(chosen_activity), prompt_to_use='ont_to_commands', verbose=self.verbose)
+      additional_prompts = ""
+      for act_name, act in self.new_activities.items():
+        if 'prompt' in act:
+          if act['type'] == chosen_activity['type']:
+            additional_prompts += "\n".join(act['prompt']) + "\n"
+      commands_string = gpt(str(chosen_activity), prompt_to_use=f"ont_to_commands_{chosen_activity['type'].lower()}", new_prompt=additional_prompts, verbose=self.verbose)
       if self.verbose:
         print("commands_string: ", commands_string)
       rob_commands = self.gpt_string_commands_to_list(commands_string)
@@ -195,35 +209,37 @@ class ButlerBrain():
   def main(self):    
     while not rospy.is_shutdown():
     
-      text_to_speech("Press enter to start the test", verbose=self.verbose)
-      input()
-      answer = tell_me_one_of("Do you want to Communicate using Speech or Sign Language?", ["speech", "sign"], verbose=self.verbose)
-      if answer == 'sign':
-        while self.sign_command is None and not rospy.is_shutdown():
-          rospy.sleep(1)
-          print("waiting for sign command")
-          if self.sign_command is not None:
-            if self.sign_command == 'None':
-              self.sign_command = None
-              continue
-            output_components = [self.sign_command.lower()]
-            break
-      elif answer == 'speech':
-        text_to_speech("Please say your request:", verbose=self.verbose)
-        user_request = speach_to_text(verbose=self.verbose)
-        output_of_gpt3 = gpt(user_request.strip(), verbose=self.verbose)
-        if self.verbose:
-          print(output_of_gpt3)
-        output_components = output_of_gpt3.strip().split("\n")
-        if self.verbose:
-          print(output_components)
-        output_components = [x.split(".")[-1].strip() for x in output_components]
-        if self.verbose:
-          print(output_components)
-      else:
-        continue
+      # text_to_speech("Press enter to start the test", verbose=self.verbose)
+      # input()
+      # answer = tell_me_one_of("Do you want to Communicate using Speech or Sign Language?", ["speech", "sign"], verbose=self.verbose)
+      # if answer == 'sign':
+      #   while self.sign_command is None and not rospy.is_shutdown():
+      #     rospy.sleep(1)
+      #     print("waiting for sign command")
+      #     if self.sign_command is not None:
+      #       if self.sign_command == 'None':
+      #         self.sign_command = None
+      #         continue
+      #       output_components = [self.sign_command.lower()]
+      #       break
+      # elif answer == 'speech':
+      #   text_to_speech("Please say your request:", verbose=self.verbose)
+      #   user_request = speach_to_text(verbose=self.verbose)
+      #   output_of_gpt3 = gpt(user_request.strip(), verbose=self.verbose)
+      #   if self.verbose:
+      #     print(output_of_gpt3)
+      #   output_components = output_of_gpt3.strip().split("\n")
+      #   if self.verbose:
+      #     print(output_components)
+      #   output_components = [x.split(".")[-1].strip() for x in output_components]
+      #   if self.verbose:
+      #     print(output_components)
+      # else:
+      #   continue
       
-      # output_components = ['chocolate', 'milk']
+      # output_components = ['tomato', 'juice']
+      # output_components = ['coffee', 'machiato']
+      output_components = ['chocolate']
       # output_components = ['tea', 'beverage']
       # output_components = ['drinking']
       # output_components = ['coffee', 'shop']
@@ -239,7 +255,6 @@ class ButlerBrain():
       ##########################################################################################################################################
       if self.load_query_results:
         query_results = deepcopy(self.query_results)
-      
       else:
         # Find the activity that outputs the components, and the name of the components in the ontology.
         # The output of GPT-3 is not necessarily the same as the name of the components in the ontology.
@@ -257,7 +272,6 @@ class ButlerBrain():
         
         query_string = "(" + event_that_has_outputs_created + "," + that_are_subclass_of_food_or_drink + \
             "," + has_objects_acted_on + "," + must_be_subclass_of_ingredints_or_vessel + "," + is_subclass_of_preparing_food_or_drink + ")." #; " + non_activity_objects
-        # query = self.prolog.query(query_string)
         query_results = self.prolog.all_solutions(query_string)
         if self.save_query_results:
           with open(self.query_results_path, 'wb') as f:
@@ -265,12 +279,13 @@ class ButlerBrain():
       # votes represent the number of components from the output of GPT-3 that appear in the name of the objects or activities in the ontology.
       # the activity with the highest number of votes is the activity that we are looking for.
       activities = deepcopy(self.new_activities)
-      print(self.new_activities)
+      if self.verbose:
+        print(self.new_activities)
       super_activities = {}
       super_objects = {}
       other_objects = {}
       is_component_used = {component:0 for component in output_components}
-      sim_thresh = 0.8
+      sim_thresh = 1.0
       data = {}
       encoded_before = {}
       if self.load_embeddings:
@@ -288,6 +303,8 @@ class ButlerBrain():
           art_sol['Sb'] = '1#PreparingABeverage' if act_data['type'] == 'Drink' else '1#PreparingAFoodItem'
           art_sol['Other'] = '1#None'
           query_results.append(art_sol)
+      
+      activities = {}
       
       for solution in query_results:
         encodings = []
@@ -336,8 +353,8 @@ class ButlerBrain():
           sup_obj_sim = cos_sim(enc, Sc_enc)
           other_obj_sim = cos_sim(enc, Other_enc)
           if (component in B.lower()) or (component in C.lower()) or (component in E.lower())\
-          or (B.lower() in component) or (C.lower() in component) or (E.lower() in component): #or\
-          # (act_sim > sim_thresh) or (output_sim > sim_thresh) or (acted_on_sim > sim_thresh):
+          or (B.lower() in component) or (C.lower() in component) or (E.lower() in component) or\
+           (act_sim > sim_thresh) or (output_sim > sim_thresh) or (acted_on_sim > sim_thresh):
             is_component_used[component] = 1
             if B not in activities.keys():
               activities[B] = {'output':C,\
@@ -359,7 +376,7 @@ class ButlerBrain():
                 activities[B]['super_activities'].append(Sb)
               if Sc not in activities[B]['super_objects']:
                 activities[B]['super_objects'].append(Sc)
-          if (component in Sb.lower()) or (Sb.lower() in component):
+          if (component in Sb.lower()) or (Sb.lower() in component) or (sup_act_sim > sim_thresh):
             is_component_used[component] = 1
             if Sb not in super_activities.keys():
               super_activities[Sb] = {
@@ -368,7 +385,7 @@ class ButlerBrain():
               super_activities[Sb]['components'].append(component)
               super_activities[Sb]['votes'] += 1
               super_activities[Sb]['sim'].append(sup_act_sim)
-          if (component in Sc.lower()) or (Sc.lower() in component):
+          if (component in Sc.lower()) or (Sc.lower() in component) or (sup_obj_sim > sim_thresh):
             is_component_used[component] = 1
             if Sc not in super_objects.keys():
               super_objects[Sc] = {'level': 'superObject',
@@ -378,7 +395,7 @@ class ButlerBrain():
               super_objects[Sc]['votes'] += 1
               super_objects[Sc]['sim'].append(sup_obj_sim)
             # print("Found activity {} that outputs {} and acts on {}".format(B, C, E))
-          if (component in Other.lower()) or (Other.lower() in component):
+          if (component in Other.lower()) or (Other.lower() in component) or (other_obj_sim > sim_thresh):
             is_component_used[component] = 1
             if Other not in other_objects.keys():
               other_objects[Other] = {'level': 'other',
@@ -396,9 +413,9 @@ class ButlerBrain():
       super_objects_list = sorted([(key, val) for key, val in super_objects.items()], key=lambda x: x[1]['votes'], reverse=True)
       other_objects_list = sorted([(key, val) for key, val in other_objects.items()], key=lambda x: x[1]['votes'], reverse=True)
       sorted_candidates = activities_list + super_activities_list + super_objects_list + other_objects_list
-      if len(sorted_candidates) < 1:
-        text_to_speech("No activities or Food or Drink found to match your request",verbose=self.verbose)
-        exit()
+      # if len(sorted_candidates) < 1:
+      #   text_to_speech("No activities or Food or Drink found to match your request",verbose=self.verbose)
+      #   exit()
       
       if self.verbose:
         print("Cadidates are: ", [(name, v['level']) for name, v in sorted_candidates])
@@ -409,8 +426,8 @@ class ButlerBrain():
           text_to_speech("Please tell me to add components or add new activity or tell me to skip it",verbose=self.verbose)
           while not rospy.is_shutdown():
             txt = speach_to_text(verbose=self.verbose)
-            if 'new' in txt or 'activity' in txt:
-              self.add_new_activity()
+            if 'new' in txt or 'activity' in txt or 'add' in txt:              
+              self.add_new_activity(top_activities=sorted_candidates)
               added_activity = True
               break
             elif 'skip' in txt:
@@ -430,6 +447,7 @@ class ButlerBrain():
               break
             else:
                 text_to_speech("Please say again, I didn't get it", verbose=self.verbose)
+          break
       if added_activity:
         continue
       # Keep only the activities that have the highest number of votes.
@@ -481,23 +499,26 @@ class ButlerBrain():
       chosen_activity = filtered_sorted_candidates[0][1]
       chosen_activity["name"] = filtered_sorted_candidates[0][0]
 
-      # Find if it is a Drink or a Food
-      found = False
-      for val in ['Drink', 'Food']:
-        objects = list(chosen_activity['objectActedOn'])
-        if 'output' in chosen_activity.keys():
-          objects.append(chosen_activity['output'])
-        for obj in objects:
-          query = self.prolog.query("subclass_of(" + self.ns + obj + "\", " + self.ns + val + "\").")
-          for solution in query.solutions():
-            chosen_activity['type'] = val
-            found = True
-            break
-          query.finish()
+      if chosen_activity['name'] in self.new_activities.keys():
+        chosen_activity = self.new_activities[chosen_activity['name']]
+      else:
+        # Find if it is a Drink or a Food
+        found = False
+        for val in ['Drink', 'Food']:
+          objects = list(chosen_activity['objectActedOn'])
+          if 'output' in chosen_activity.keys():
+            objects.append(chosen_activity['output'])
+          for obj in objects:
+            query = self.prolog.query("subclass_of(" + self.ns + obj + "\", " + self.ns + val + "\").")
+            for solution in query.solutions():
+              chosen_activity['type'] = val
+              found = True
+              break
+            query.finish()
+            if found:
+              break
           if found:
             break
-        if found:
-          break
       
       # Perform the activities
       self.perform_activity(chosen_activity)

@@ -47,12 +47,12 @@ Q:Some lemonade will do wonders for me right now:
 Q:Life without meat is nothing:
 1.meat
 Q:I want to eat some burgers:
-1. burger\n
+1. burger
 Q:I would love it if you can prepare me a nice drink:
 v. prepare
 1. drink
 Q:Do you have some falafel?
-1. falafel\n"""
+1. falafel"""
 
 text_to_keyword_prompt = """Q:Put lemon on water please:
 1. lemon
@@ -70,7 +70,7 @@ Q:Some lemonade will do wonders for me right now:
 Q:Life without meat is nothing:
 1.meat
 Q:I want to eat some burgers:
-1. burger\n
+1. burger
 Q:I would love it if you can prepare me a nice drink:
 1. drink
 Q:Do you have some falafel?
@@ -90,13 +90,15 @@ Q:Make me a cup of lemonade
 2.lemonade
 Q:Prepare me a big rice plate
 1.rice
-2.plate\n"""
+2.plate"""
 
-text_to_commands = """Q:you put tea packet in a cup and then you put water in the cup:
+text_to_commands_drink = """Q:you put tea packet in a cup and then you put water in the cup:
 1. transport(tea-packet, cup)
 2. pour(water, cup)
 container(cup)
-Q: First put cheese on the breat, then put in the oven to heat it up for a few minutes, then take it out of the oven and enjoy:
+"""
+
+text_to_commands_food = """Q: First put cheese on the breat, then put in the oven to heat it up for a few minutes, then take it out of the oven and enjoy:
 1. transport(cheese, pizza)
 2. transport(pizza, oven)
 container(oven)
@@ -104,7 +106,7 @@ Q: put oats in a bowl, add milk, add honey, mix it all together, and enjoy:
 1. transport(oats, bowl)
 2. pour(milk, bowl)
 3. pour(honey, bowl)
-container(bowl)\n
+container(bowl)
 """
 
 # text_to_commands = """Q:you put tea packet in a cup and then you put water in the cup:
@@ -121,13 +123,16 @@ container(bowl)\n
 # 3. pour(honey, bowl)
 # """
 
-ont_to_commands = """Q: {'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}:
+ont_to_commands_drink = """Q: {'output': 'Tea-Beverage', 'sim': [0.9059747, 0.8054108], 'objectActedOn': ['DrinkingMug', 'TeaPacket', 'Water'], 'level': 'activity', 'components': ['tea', 'beverage'], 'votes': 2, 'super_activities': ['PreparingABeverage'], 'super_objects': ['InfusionDrink'], 'score': 0.8556927442550659, 'name': 'MakingTea-TheBeverage', 'type': 'Drink', 'objects_details': {'DrinkingMug': [('type', 'Class'), ('subClassOf', 'Cup')], 'TeaPacket': [('type', 'Class'), ('subClassOf', 'DrinkingIngredient')], 'Water': [('type', 'Class'), ('subClassOf', 'ColorlessThing'), ('subClassOf', 'Drink'), ('subClassOf', 'DrinkingIngredient'), ('subClassOf', 'EnduringThing-Localized')]}}:
 1. transport(tea-packet, drinking-mug)
 2. pour(water, drinking-mug)
 container(drinking-mug)
 Q:{'output': 'Juice', 'sim': [0.9999999], 'objectActedOn': ['DrinkingGlass', 'Juice'], 'level': 'activity', 'components': ['juice'], 'votes': 1, 'super_activities': ['PreparingABeverage'], 'super_objects': ['Drink'], 'score': 0.9999998807907104, 'name': 'MakingJuice', 'type': 'Drink', 'objects_details': {'DrinkingGlass': [('type', 'Class'), ('subClassOf', 'DrinkingVessel')]}}:
 1. pour(juice, drinking-glass)
-container(drinking-glass)\n
+container(drinking-glass)
+"""
+
+ont_to_commands_food = """
 """
 
 
@@ -149,12 +154,14 @@ steps:
 3. pour(oil, pan)
 4. break(eggs, pan)
 5. wait(3, minutes)
-6. turn_off(stove)\n
+6. turn_off(stove)
 """
 
 prompts = {'text_to_keywords': text_to_keyword_prompt,
-           'text_to_commands': text_to_commands,
-           'ont_to_commands': ont_to_commands,
+           'text_to_commands_drink': text_to_commands_drink,
+           'ont_to_commands_food': ont_to_commands_food,
+           'text_to_commands_drink': text_to_commands_drink,
+           'ont_to_commands_food': ont_to_commands_food,
            'components_to_steps': components_to_steps_prompt}
 
 # Audio recording parameters
@@ -458,9 +465,9 @@ def tell_me_one_of(question, answers=['yes', 'no'], verbose=False, loop_stop_con
     txt = "I didn't get that, please tell me one of the following: " + str(answers)
     text_to_speech(txt, verbose=verbose)
   
-def gpt(text, prompt_to_use='text_to_keywords', verbose=False):
+def gpt(text, prompt_to_use='text_to_keywords', new_prompt="", verbose=False):
   # print(text_to_keyword_prompt+text)
-  prompt = prompts[prompt_to_use]
+  prompt = prompts[prompt_to_use] + new_prompt + "\n"
   response = openai.Completion.create(
     engine="code-cushman-001",
     prompt=prompt+"Q:" + text + ":",
@@ -473,6 +480,7 @@ def gpt(text, prompt_to_use='text_to_keywords', verbose=False):
     stop=["Q:"]
   )
   if verbose:
+    print(prompt+"Q:" + text + ":")
     print(response)
   return response["choices"][0]["text"]
 
