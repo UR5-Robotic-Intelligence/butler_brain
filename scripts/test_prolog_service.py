@@ -209,37 +209,37 @@ class ButlerBrain():
   def main(self):    
     while not rospy.is_shutdown():
     
-      # text_to_speech("Press enter to start the test", verbose=self.verbose)
-      # input()
-      # answer = tell_me_one_of("Do you want to Communicate using Speech or Sign Language?", ["speech", "sign"], verbose=self.verbose)
-      # if answer == 'sign':
-      #   while self.sign_command is None and not rospy.is_shutdown():
-      #     rospy.sleep(1)
-      #     print("waiting for sign command")
-      #     if self.sign_command is not None:
-      #       if self.sign_command == 'None':
-      #         self.sign_command = None
-      #         continue
-      #       output_components = [self.sign_command.lower()]
-      #       break
-      # elif answer == 'speech':
-      #   text_to_speech("Please say your request:", verbose=self.verbose)
-      #   user_request = speach_to_text(verbose=self.verbose)
-      #   output_of_gpt3 = gpt(user_request.strip(), verbose=self.verbose)
-      #   if self.verbose:
-      #     print(output_of_gpt3)
-      #   output_components = output_of_gpt3.strip().split("\n")
-      #   if self.verbose:
-      #     print(output_components)
-      #   output_components = [x.split(".")[-1].strip() for x in output_components]
-      #   if self.verbose:
-      #     print(output_components)
-      # else:
-      #   continue
+      text_to_speech("Press enter to start the test", verbose=self.verbose)
+      input()
+      answer = tell_me_one_of("Do you want to Communicate using Speech or Sign Language?", ["speech", "sign"], verbose=self.verbose)
+      if answer == 'sign':
+        while self.sign_command is None and not rospy.is_shutdown():
+          rospy.sleep(1)
+          print("waiting for sign command")
+          if self.sign_command is not None:
+            if self.sign_command == 'None':
+              self.sign_command = None
+              continue
+            output_components = [self.sign_command.lower()]
+            break
+      elif answer == 'speech':
+        text_to_speech("Please say your request:", verbose=self.verbose)
+        user_request = speach_to_text(verbose=self.verbose)
+        output_of_gpt3 = gpt(user_request.strip(), verbose=self.verbose)
+        if self.verbose:
+          print(output_of_gpt3)
+        output_components = output_of_gpt3.strip().split("\n")
+        if self.verbose:
+          print(output_components)
+        output_components = [x.split(".")[-1].strip() for x in output_components]
+        if self.verbose:
+          print(output_components)
+      else:
+        continue
       
       # output_components = ['tomato', 'juice']
       # output_components = ['coffee', 'machiato']
-      output_components = ['chocolate']
+      # output_components = ['chocolate']
       # output_components = ['tea', 'beverage']
       # output_components = ['drinking']
       # output_components = ['coffee', 'shop']

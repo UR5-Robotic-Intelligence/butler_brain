@@ -109,6 +109,18 @@ Q: put oats in a bowl, add milk, add honey, mix it all together, and enjoy:
 container(bowl)
 """
 
+request_to_commands_drink = """Q:Make me orange juice please:
+1. transport(orange, cup)
+2. pour(water, cup)
+container(cup)
+"""
+
+request_to_commands_food = """Q:Make me nautella sandwich please:
+1. transport(nautella, plate)
+2. pour(bread, plate)
+container(plate)
+"""
+
 # text_to_commands = """Q:you put tea packet in a cup and then you put water in the cup:
 # 1. tea-packet
 # 2. water
@@ -162,7 +174,12 @@ prompts = {'text_to_keywords': text_to_keyword_prompt,
            'ont_to_commands_food': ont_to_commands_food,
            'text_to_commands_drink': text_to_commands_drink,
            'ont_to_commands_food': ont_to_commands_food,
-           'components_to_steps': components_to_steps_prompt}
+           'text_to_commands': text_to_commands_drink+text_to_commands_food,
+           'ont_to_commands': ont_to_commands_food+ont_to_commands_drink,
+           'components_to_steps': components_to_steps_prompt,
+           'request_to_commands': request_to_commands_drink+request_to_commands_food,
+           'request_to_commands_drink': request_to_commands_drink,
+           'request_to_commands_food': request_to_commands_food}
 
 # Audio recording parameters
 RATE = 16000
