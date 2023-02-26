@@ -92,23 +92,22 @@ Q:Prepare me a big rice plate
 1.rice
 2.plate"""
 
-text_to_commands_drink = """Q:you put tea packet in a cup and then you put water in the cup:
-1. transport(tea-packet, cup)
+text_to_commands_drink = """Q:you squeeze the orange in the cup and then you put water in the cup:
+1. transport(orange, cup)
 2. pour(water, cup)
 container(cup)
 """
 
-text_to_commands_food = """Q: First put cheese on the breat, then put in the oven to heat it up for a few minutes, then take it out of the oven and enjoy:
-1. transport(cheese, pizza)
-2. transport(pizza, oven)
-container(oven)
-Q: put oats in a bowl, add milk, add honey, mix it all together, and enjoy:
-1. transport(oats, bowl)
-2. pour(milk, bowl)
-3. pour(honey, bowl)
-container(bowl)
+text_to_commands_food = """Q:you spread the nautella on the bread and then you put it on the plate:
+1. transport(nautella, plate)
+2. transport(bread, plate)
+container(plate)
 """
-
+# Q: First put cheese on the bread, then put in the oven to heat it up for a few minutes, then take it out of the oven and enjoy:
+# 1. transport(cheese, bread)
+# 2. transport(bread, oven)
+# 2. transport(bread, table)
+# container(oven)
 request_to_commands_drink = """Q:Make me orange juice please:
 1. transport(orange, cup)
 2. pour(water, cup)
@@ -117,7 +116,19 @@ container(cup)
 
 request_to_commands_food = """Q:Make me nautella sandwich please:
 1. transport(nautella, plate)
-2. pour(bread, plate)
+2. transport(bread, plate)
+container(plate)
+"""
+
+text_and_request_to_commands_drink = """Q:Make me orange juice please; To do it; you squeeze the orange in the cup and then you put water in the cup:
+1. transport(orange, cup)
+2. pour(water, cup)
+container(cup)
+"""
+
+text_and_request_to_commands_food = """Q:Make me nautella sandwich please; To do it; you spread the nautella on the bread and then you put it on the plate:
+1. transport(nautella, bread)
+2. transport(bread, plate)
 container(plate)
 """
 
@@ -172,14 +183,17 @@ steps:
 prompts = {'text_to_keywords': text_to_keyword_prompt,
            'text_to_commands_drink': text_to_commands_drink,
            'ont_to_commands_food': ont_to_commands_food,
-           'text_to_commands_drink': text_to_commands_drink,
-           'ont_to_commands_food': ont_to_commands_food,
+           'text_to_commands_food': text_to_commands_food,
+           'ont_to_commands_drink': ont_to_commands_drink,
            'text_to_commands': text_to_commands_drink+text_to_commands_food,
            'ont_to_commands': ont_to_commands_food+ont_to_commands_drink,
            'components_to_steps': components_to_steps_prompt,
            'request_to_commands': request_to_commands_drink+request_to_commands_food,
            'request_to_commands_drink': request_to_commands_drink,
-           'request_to_commands_food': request_to_commands_food}
+           'request_to_commands_food': request_to_commands_food,
+           'text_and_request_to_commands_drink': text_and_request_to_commands_drink,
+           'text_and_request_to_commands_food': text_and_request_to_commands_food,
+           'text_and_request_to_commands': text_and_request_to_commands_drink+text_and_request_to_commands_food}
 
 # Audio recording parameters
 RATE = 16000
@@ -490,16 +504,18 @@ def gpt(text, prompt_to_use='text_to_keywords', new_prompt="", verbose=False):
     prompt=prompt+"Q:" + text + ":",
     temperature=0,
     max_tokens=70,
-    top_p=0.1,
+    top_p=0.01,
     n=1,
     stream=False,
     logprobs=None,
     stop=["Q:"]
   )
   if verbose:
+    print("The used gpt prompt is:")
     print(prompt+"Q:" + text + ":")
+    print("The gpt response is:")
     print(response)
-  return response["choices"][0]["text"]
+  return response["choices"][0]["text"], prompt
 
 def get_activity_steps(activity_name, activity_components_dict, verbose=False):
   # print(text_to_keyword_prompt+text)

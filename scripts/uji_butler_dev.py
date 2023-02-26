@@ -17,6 +17,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from fuzzywuzzy import fuzz
 import bert_score
 import re
+import json
 
 
 class ButlerBrain():
@@ -36,6 +37,7 @@ class ButlerBrain():
     args.add_argument('-e', '--exp', type=str, help='The experiments are (from_description, from_request, from_description_and_request)')
     args.add_argument('-ue', '--use_experience', action='store_true', help='Use the experience to generate the robot commands')
     args.add_argument('-ut', '--use_type', action='store_true', help='Use the type (meal/drink) to generate the robot commands')
+    args.add_argument('-ur', '--use_reasoing', action='store_true', help='Use the reasoning to generate the robot commands')
     self.verbose = args.parse_args().verbose
     self.load_embeddings = args.parse_args().load_embeddings
     self.save_embeddings = args.parse_args().save_embeddings
@@ -49,6 +51,7 @@ class ButlerBrain():
     self.exp = args.parse_args().exp
     self.use_experience = args.parse_args().use_experience
     self.use_type = args.parse_args().use_type
+    self.use_reasoing = args.parse_args().use_reasoing
     # self.verbose = True
     # self.load_embeddings = False
     # self.save_embeddings = True
@@ -68,30 +71,56 @@ class ButlerBrain():
     exp_name = self.exp
     exp_name += '_use_experience' if self.use_experience else ''
     exp_name += '_use_type' if self.use_type else ''
+    exp_name += '_use_reasoing' if self.use_reasoing else ''
     self.data_path = os.path.join(os.getcwd(), f'uji_butler_wokring_memory_at_{time_str}.txt')
     self.query_results_path = os.path.join(os.getcwd(), f'query_results_at_{time_str}.pkl')
     self.new_activities_path = os.path.join(os.getcwd(), f'new_activities_at_{time_str}.pkl')
     self.new_prompts_path = os.path.join(os.getcwd(), f'new_prompts_at_{time_str}.txt')
     self.experiments_data_path = os.path.join(os.getcwd(), f'experiments_data_{exp_name}_at_{time_str}.pkl')
+    self.new_triples_path = os.path.join(os.getcwd(), f'new_triples.pkl')
     self.new_activities = {}
+    self.new_info = []
     if self.load_query_results:
       with open(self.query_results_path.split('_at_')[0]+'.pkl', 'rb') as f:
         self.query_results = pickle.load(f)
     if self.load_activities:
       with open(self.new_activities_path, 'rb') as f:
         self.new_activities = pickle.load(f)
+      with open(self.new_triples_path, 'rb') as f:
+        new_triples = pickle.load(f)
+      self.prolog.all_solutions(new_triples)
     rospy.Subscriber("/sign_command", String, self.sign_command_callback)
     self.sign_command = None
     self.experiments_data = {}
     self.total_mistakes = 0
+    self.reasoning_correction = 0
   
   def sign_command_callback(self, msg):
     self.sign_command = msg.data
     
-  def gpt_string_commands_to_list(self, gpt_string, return_components=False, use_gpt_string=True):
+  def gpt_string_commands_to_list(self, gpt_string, return_components=False, use_gpt_string=True, act_type=None):
     gpt_string = gpt_string.strip().strip().split("\n")
+    new_gpt_string = deepcopy(gpt_string)
     # print("gpt_string: ", gpt_string)    
     container = gpt_string[-1][10:-1]
+    if self.use_type and use_gpt_string and self.use_reasoing:
+      A = f"{self.ns}{container}\""
+      if act_type == "Food":
+        query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}DrinkingVessel\")."
+        query = self.prolog.query(query_str)
+        for solution in query.solutions():
+          print(f"corrected container using reasoning from {container} to plate")
+          self.reasoning_correction += 1
+          new_gpt_string = [cmd.replace(container, "plate") for cmd in new_gpt_string]
+          container = "plate"
+      else:
+        query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}EatingVessel\")."
+        query = self.prolog.query(query_str)
+        for solution in query.solutions():
+          print(f"corrected container using reasoning from {container} to cup")
+          self.reasoning_correction += 1
+          new_gpt_string = [cmd.replace(container, "cup") for cmd in new_gpt_string]
+          container = "cup"
     output_components = []
     rob_commands = []
     steps = []
@@ -102,12 +131,35 @@ class ButlerBrain():
       if not use_gpt_string:
         func_name = step.split(" to ")[0].split(" ")[0]
         input_args = [step.split(" to ")[0].split(" ")[1].strip()]
-        input_args.append(step.split(" to ")[1].strip())
+        A = f"{self.ns}{input_args[0]}\""
+        if func_name == "pour":
+          self.new_info.append(f"subclass_of({A}, {self.ns}LiquidTangibleThing\")")
+        elif func_name == "transport":
+          self.new_info.append(f"subclass_of({A}, {self.ns}SolidTangibleThing\")")
+        input_args.append(step.split(" to ")[1].strip())          
       else:
         step = step.split(".")[-1].strip()
         func_name = step.split("(")[0]
         input_args = step.split("(")[1].split(")")[0].split(",")
-        input_args = [arg.strip() for arg in input_args]
+        if func_name == "transport" and self.use_reasoing:
+          A = f"{self.ns}{input_args[0]}\""
+          query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}LiquidTangibleThing\")."
+          query = self.prolog.query(query_str)
+          for solution in query.solutions():
+            print("corrected command using reasoning from transport to pour")
+            self.reasoning_correction += 1
+            func_name = "pour"
+            new_gpt_string[i] = new_gpt_string[i].replace("transport", "pour")
+        elif func_name == "pour" and self.use_reasoing:
+          A = f"{self.ns}{input_args[0]}\""
+          query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}SolidTangibleThing\")."
+          query = self.prolog.query(query_str)
+          for solution in query.solutions():
+            print("corrected command using reasoning from pour to transport")
+            self.reasoning_correction += 1
+            func_name = "transport"
+            new_gpt_string[i] = new_gpt_string[i].replace("pour", "transport")
+          input_args = [arg.strip() for arg in input_args]
       if len(input_args) == 2 and input_args[1] == container:
         steps.append(f"{func_name} {input_args[0]} to {input_args[1]}")
       elif len(input_args) == 1:
@@ -117,7 +169,8 @@ class ButlerBrain():
       # print(func_name, input_args)
     # print(container)
     if return_components:
-      return rob_commands, output_components, container, steps, func_name
+      new_gpt_string = "\n".join(new_gpt_string)
+      return rob_commands, output_components, container, steps, func_name, new_gpt_string
     return rob_commands
   
   def activity_to_steps_prompt(self, activity):
@@ -159,6 +212,7 @@ class ButlerBrain():
     # self.experiments_data[act_name]['bleu_score'] = bleu_score
     # levenshtein similarity
     fuzzy_score = fuzz.ratio(label_rob_commands_str, new_res)
+    self.experiments_data[act_name]['fuzzy_score'] = a_bert_score
     print(f'fuzzy_score = {fuzzy_score}')
     rob_commands_list = new_res.split('\n')
     rob_commands_list[:-1] = [cmd.split('.')[1] for cmd in rob_commands_list[:-1]]
@@ -185,11 +239,17 @@ class ButlerBrain():
       self.experiments_data[act_name]['mistakes'] = mistakes
     else:
       print("No mistakes")
+    if self.reasoning_correction > 0:
+      print("Reasoning correction = ", self.reasoning_correction)
+    else:
+      print("No reasoning correction")
     self.experiments_data[act_name]['n_mistakes'] = n_mistakes
     self.total_mistakes += n_mistakes
     print("total mistakes = ", self.total_mistakes)
   
   def add_new_activity(self, data_point, predict=False):
+    self.new_info = []
+    self.reasoning_correction = 0
     output_name = data_point['output']
     act_name = "Making-"+output_name
     print("output = ",act_name)
@@ -225,9 +285,11 @@ class ButlerBrain():
     #       4.also the func_name needs to be checked for existence as a capability, if not, find a way to automatically define it,
     #         and ask user for any missing or needed information.
     #       5.Find how to add these to the ontology. (would help in the reasoning)
-    rob_commands, output_components, container, steps, func_name = self.gpt_string_commands_to_list(res, return_components=True)
-    label_rob_commands, output_components, container, steps, func_name= self.gpt_string_commands_to_list("\n".join(data_point['steps']), use_gpt_string=False, return_components=True)
+    rob_commands, output_components, container, steps, func_name, res = self.gpt_string_commands_to_list(res, return_components=True, act_type=type_txt)
+    label_rob_commands, output_components, container, steps, func_name, _= self.gpt_string_commands_to_list("\n".join(data_point['steps']),
+                                                                                                         use_gpt_string=False, return_components=True, act_type=type_txt)
     self.experiments_data[act_name]['rob_commands'] = rob_commands
+    self.experiments_data[act_name]['reasoning_corrections'] = self.reasoning_correction
     
     # compare the predicted commands with the labeled commands
     self.compare_commands(rob_commands, label_rob_commands, container, act_name, res)
@@ -260,11 +322,47 @@ class ButlerBrain():
                                            'request':request,
                                            'description':act_description}
     # New Triples
-    # self.new_triples.append((f"{self.ns}{act_name}\"", "rdf:type", "owl:NamedIndividual"))
-    
+    if self.use_reasoing:
+      # new_triples = []
+      B = f"{self.ns}{act_name}\""
+      Sb = f"{self.ns}{sup_act}\""
+      C = f"{self.ns}{output_name}\""
+      Sc = f"{self.ns}{type_txt}\""
+      R = f"{self.ns}{act_name}_{output_name}\""
+      # rdfs = "http://www.w3.org/2000/01/rdf-schema#"
+      # new_triples.append({'s':f"{B}", 'p':f"{rdfs}subClassOf", 'o':f"{Sb}"})
+      self.new_info.append(f"subclass_of({B},{Sb})")
+      self.new_info.append(f"is_restriction({R}, some({self.ns}outputsCreated\",{C}))")
+      self.new_info.append(f"subclass_of({B},{R})")
+      self.new_info.append(f"subclass_of({C},{Sc})")
+      for com in output_components:
+        R_i = f"{self.ns}{act_name}_objectActedOn_{com}\""
+        E = f"{self.ns}{com}\""
+        self.new_info.append(f"is_restriction({R_i}, some({self.ns}objectActedOn\",{E}))")
+        self.new_info.append(f"subclass_of({B},{R_i})")
+        # self.new_info.append(f"subclass_of({E},{Sc})")
+        if type_txt == 'Drink':
+          if com != container:
+            self.new_info.append(f"subclass_of({E},{self.ns}DrinkingIngredient\")")
+          else:
+            self.new_info.append(f"subclass_of({E},{self.ns}DrinkingVessel\")")
+        else:
+          if com != container:
+            self.new_info.append(f"subclass_of({E},{self.ns}FoodIngredient\")")
+          else:
+            self.new_info.append(f"subclass_of({E},{self.ns}EatingVessel\")")
+      self.new_info = [f"kb_project({i})" for i in self.new_info]
+      query_string = ",".join(self.new_info)
+      # print("query_string = ", query_string)
+      self.prolog.all_solutions(query_string)
+    # exit()
+    # with open('/home/bass/triples/new_triples.json','a') as f:
+    #   json.dump(a,f)
     if self.save_activites:
       with open(self.new_activities_path, 'wb') as f:
         pickle.dump(self.new_activities, f)
+      with open(self.new_triples_path, 'wb') as f:
+        pickle.dump(query_string, f)
     # self.perform_activity(self.new_activities[act_name])
   
   def perform_activity(self, chosen_activity):
@@ -298,6 +396,7 @@ class ButlerBrain():
     self.ra.prepare_food_or_drink(chosen_activity, container=container)
   
   def main(self):
+
     commands_list_drinks = ["Make me tomato juice please",
                      "I would love a coffee machiato please",
                      "Please prepare me a hot-chocolate",
@@ -331,18 +430,18 @@ class ButlerBrain():
     commands_list_foods = ["Make me a chicken sandwich please",
                            "I would appreciate it if you could prepare me a cheese sandwich",
                            "having a green salad would be great",
-                           "I would like a bowl of pasta",
+                           "I would like a bowl of pasta with tomato sauce",
                            "Could you please prepare me a bowl of rice",
                            "I am craving for some chicken soup",
                            "I am in the mood for some beef steak"]
     output_components_list_foods = [['chicken', 'sandwich'],
                                     ['cheese', 'sandwich'],
                                     ['green', 'salad'],
-                                    ['bowl', 'pasta'],
+                                    ['bowl', 'pasta', 'tomato-sauce'],
                                     ['bowl', 'rice'],
                                     ['chicken', 'soup'],
                                     ['beef', 'steak']]
-    output_name_list_foods = ['ChickenSandwich', 'CheeseSandwich', 'GreenSalad', 'Pasta', 'Rice', 'ChickenSoup', 'BeefSteak']
+    output_name_list_foods = ['ChickenSandwich', 'CheeseSandwich', 'GreenSalad', 'PastaWithTomatoSause', 'Rice', 'ChickenSoup', 'BeefSteak']
     steps_list_foods = [['transport chicken to plate', 'transport bread to plate', 'transport cheese to plate', 'container(plate)'],
                         ['transport cheese to plate', 'transport bread to plate', 'container(plate)'],
                         ['transport lettuce to plate', 'transport tomato to plate', 'transport cucumber to plate', 'pour olive-oil to plate', 'container(plate)'],
@@ -427,7 +526,7 @@ class ButlerBrain():
         that_are_subclass_of_food_or_drink = "subclass_of(Sc," + self.ns + "FoodOrDrink\"),subclass_of(Other,Sc),\\+is_restriction(_,some(" + self.ns + "outputsCreated\", Other))"
         has_objects_acted_on = "is_restriction(D,some(" + self.ns + "objectActedOn\",E)),subclass_of(B,D),subclass_of(B,Sb),\\+subclass_of(Sb,D)"
         must_be_subclass_of_ingredints_or_vessel = "(subclass_of(E," + self.ns + "DrinkingIngredient" + "\");subclass_of(E," + self.ns + "DrinkingVessel" + "\");"
-        must_be_subclass_of_ingredints_or_vessel += "subclass_of(E," + self.ns + "FoodIngredient" + "\");subclass_of(E," + self.ns + "FoodVessel" + "\"))"
+        must_be_subclass_of_ingredints_or_vessel += "subclass_of(E," + self.ns + "FoodIngredient" + "\");subclass_of(E," + self.ns + "EatingVessel" + "\"))"
         is_subclass_of_preparing_food_or_drink = "subclass_of(Sb," + self.ns + "PreparingFoodOrDrink\")"
         # non_activity_objects = "(subclass_of(NAO, " + self.ns + "FoodOrDrinkOrIngredient\"))" #, \\+(subclass_of(NAO, B); subclass_of(NAO, Sb)))"
         
