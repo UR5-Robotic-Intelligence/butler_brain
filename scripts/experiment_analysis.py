@@ -5,20 +5,21 @@ from datetime import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import re
 
 
-experiment_names = ['from_description_and_request_use_experience_use_type',
-                    'from_description_and_request_use_experience',
-                    'from_description_and_request_use_type',
-                    'from_description_and_request',
-                    'from_description_use_experience_use_type',
+experiment_names = ['from_description_and_request_use_experience',
                     'from_description_use_experience',
-                    'from_description_use_type',
-                    'from_description',
-                    'from_request_use_experience_use_type',
                     'from_request_use_experience',
-                    'from_request_use_type',
-                    'from_request']
+                    'from_description_and_request_use_experience_use_type',
+                    'from_description_use_experience_use_type',
+                    'from_request_use_experience_use_type',
+                    'from_description_and_request',
+                    'from_description',            
+                    'from_request',
+                    'from_description_and_request_use_type',
+                    'from_description_use_type',
+                    'from_request_use_type']
 figure_titles = ['(experience and type)',
                  '(experience)',
                  '(type)',
@@ -32,7 +33,7 @@ figure_titles = ['(experience and type)',
                  '(type)',
                  'No Additional Information']
 
-def get_experiment_data(data_dir="/home/bass/experiments/with both/2"):
+def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys=False):
   experiments_data = {}
   for i, core_experiment_name in enumerate(experiment_names):
       for j, cond in enumerate(['_use_reasoning', '']):
@@ -49,6 +50,7 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2"):
         for k, v in experiment.items():
             if 'n_mistakes' not in v:
                 v['n_mistakes'] = 0
+            v['n_mistakes'] /= len(v['rob_commands']) 
         experiments_data[experiment_name] = experiment
   return experiments_data
 
@@ -76,13 +78,15 @@ def dict_to_excel(experiment, experiment_name):
   # print(df)
   df.to_excel('experiment_{}.xlsx'.format(experiment_name), index=True)
 
-def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with both/2', input_type='', score_type='n_mistakes', plot=True):
+def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with both/2', input_type='', score_type='n_mistakes', plot=True, sort_keys=False):
+  
   if input_type == 'description':
     none_of = ['request']
   elif input_type == 'request':
     none_of = ['description']
   else:
     none_of = []
+  
   experiments_data = get_experiment_data()
   all_exps = []
   experiments_1 = filter_experiment_data(experiments_data, all_of=[f'from_{input_type}', 'reasoning'], none_of=none_of)
@@ -106,7 +110,8 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
             print(f"sum_{score_type_} = ", sum(scores))
           else:
             print(f"mean_{score_type_} = ", np.mean(scores))
-        scores = sum(scores) if score_type_ == 'n_mistakes' else np.mean(scores)
+        # scores = sum(scores) if score_type_ == 'n_mistakes' else np.mean(scores)
+        scores = np.mean(scores)
         if score_type_ not in experiment_scores_dict:
           experiment_scores_dict[score_type_] = {j:[] for j in range(len(all_exps))}
         experiment_scores_dict[score_type_][i].append(scores)
@@ -119,13 +124,23 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   tfs = 15
   rotation = 0 if input_type != '' else 90
   fig_titles = ['With Reasoning', 'No Reasoning']
+  new_fig_titles = []
+  for score_type_ in score_type:
+    for i,ft in enumerate(fig_titles):
+      new_fig_titles.append(f'{ft} ({score_type_})')
+  fig_titles = new_fig_titles
   color = ['blue', 'red', 'green', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
   title = 'Reasoning vs No Reasoning' if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
   x_label = f'Additional Information (All have activity {input_type})' if input_type != '' else 'Additional Information'
   if input_type != '':
     x_ticks = [name.replace(f'from_{input_type}_use_','').replace('use','and').replace(f'from_{input_type}','nothing') for name in experiments_2.keys()]
   else:
-    x_ticks = [name.replace(f'from_','').replace('_use_reasoning','').replace('use','and') for name in all_exps[0].keys()]
+    p4 = 'from_description'
+    p6 = 'from_request'
+    p2 = 'from_description_and_request'
+    p1, p3, p5 = p2 + '_use_', p4 + '_use_', p6 + '_use_'
+    
+    x_ticks = [re.sub(f'({p1})|({p2})|({p3})|({p4})|({p5})|({p6})','',name).replace('_use_reasoning','').replace('_use_',',') for name in all_exps[0].keys()]
   y_label = 'Number of Mistakes' if score_type == 'n_mistakes' else 'Fuzzy Score'
   bottom = 90 if score_type == 'fuzzy_score' else 0
   name = f'{title}_using_{score_type}'
@@ -134,17 +149,37 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   ax = plt.gca()
   ax.set_xlabel(f'{x_label}', fontsize=fs, fontweight='bold')
   l = 0
+  regions = 'input_types'
+  regions = 'additional_info_types'
+  alpha = 0.3
+  if regions == 'input_types':
+    ax.axvspan(0, 4, color='red', alpha=alpha, label='Description & Request')
+    ax.axvspan(4, 8, color='blue', alpha=alpha, label='Description')
+    ax.axvspan(8, 12, color='green', alpha=alpha, label='Request')
+  elif regions == 'additional_info_types':
+    ax.axvspan(-0.5, 2.5, color='red', alpha=alpha, label='Experience')
+    ax.axvspan(2.5, 5.5, color='blue', alpha=alpha, label='Experience & Type')
+    ax.axvspan(5.5, 8.5, color='green', alpha=alpha, label='No Additional Info')
+    ax.axvspan(8.5, 11.5, color='orange', alpha=alpha, label='Type')
   for sc_i, (score_type_, experiment_scores) in enumerate(experiment_scores_dict.items()):
+    plt.yticks(fontsize=tfs, fontweight='bold')
     x_axis = []
     h = []
+    reverse = False if score_type_ == 'fuzzy_score' else True
     if sc_i == 1:
       ax = ax.twinx()
+    if sort_keys:
+      for i in range(len(all_exps)):
+        sorted_indices = np.argsort(experiment_scores[i])
+        sorted_indices = np.flip(sorted_indices) if reverse else sorted_indices
+        experiment_scores[i] = [experiment_scores[i][j] for j in sorted_indices]
+        experiment_names[i] = [experiment_names[i][j] for j in sorted_indices]
     if bar_plot:
       bars_per_tick = len(all_exps) # reasoning vs no reasoning
       w = 0.5
       shift = int(w*bars_per_tick + w*2)
       z = (bars_per_tick)/2.0 - w
-      if bar_plot and plot:
+      if bar_plot:
         for i in range(len(all_exps)):
           x_axis.append(np.arange(len(experiment_scores[i])*shift, step=shift))
           h.append(np.array(experiment_scores[i]))
@@ -156,7 +191,7 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
         yt=np.append(yt,bottom)
         ax.set_yticks(yt)
         ax.set_yticklabels(yt)
-        
+      
       for i, (xi, hi) in enumerate(zip(x_axis, h)):
         plt.bar(xi - z*w + i*w, hi-bottom, w, bottom=bottom, label=fig_titles[i], color=color[i+sc_i])
         
@@ -168,24 +203,22 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
       ax.set_ylabel(f"{score_type_}",
             color=color[sc_i],
             fontsize=fs)
+
       for i in range(len(all_exps)):
-        x = np.arange(len(experiment_names[i]))
+        x_order = np.arange(len(experiment_names[i]))
         y = np.array(experiment_scores[i])
         marker = 'o' if i == 0 else 'x'
         if sc_i == 0 and i == 0:
-          ax.set_xticks(x, x_ticks, rotation=rotation, fontsize=tfs, fontweight='bold')
-        ax.plot(x, y, label=fig_titles[i], color=color[sc_i], marker=marker, markersize=10, linewidth=2)
+          ax.set_xticks(x_order, x_ticks, rotation=rotation, fontsize=tfs, fontweight='bold')
+        ax.plot(x_order, y, label=fig_titles[l], color=color[sc_i], marker=marker, markersize=10, linewidth=2)
         l+=1
       loc = (-0.03, 1.02) if sc_i == 0 else (0.81, 1.02)
       ax.legend(fontsize=tfs, loc=loc)
-      # yt = ax.get_yticks()
-      # ax.set_yticks(yt,fontsize=tfs, fontweight='bold')
-    plt.yticks(fontsize=tfs, fontweight='bold')
   plt.title(f"{title}", fontsize=fs, fontweight='bold')
   # plt.legend(fontsize=tfs)
   plt.grid()
   figure = plt.gcf() # get current figure
-  figure.set_size_inches(11, 10)
+  figure.set_size_inches(15, 10)
   plt.savefig(os.path.join(data_dir,name),dpi=300,bbox_inches='tight')
   plt.show()
 

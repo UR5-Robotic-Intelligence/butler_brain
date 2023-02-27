@@ -498,6 +498,37 @@ class ButlerBrain():
                                      "pour milk into a mug",
                                      "add coffee powder, water, and milk to the cup",
                                      "mix carrots with water in a cup"]
+    
+    test_commands_list_drinks = ["Please make me a strawberry smoothie",
+    "Can I have a pineapple juice?",
+    "Make me a green tea with sweetener please",
+    "I would like a mango lassi please",
+    "Can you prepare a blueberry iced tea for me?"]
+
+    test_output_components_list_drinks = [['strawberry','smoothie'],
+    ['pineapple', 'juice'],
+    ['green', 'tea', 'sweetener'],
+    ['mango', 'lassi'],
+    ['iced-tea', 'blueberry']]
+
+    test_output_name_list_drinks = ['StrawberrySmoothie',
+    'PineappleJuice',
+    'GreenTeaLatte',
+    'MangoLassi',
+    'BlueberryIcedTea']
+
+    test_steps_description_list_drinks = ['blend frozen strawberries, yogurt, honey, and milk in a blender, then pour the mixture into a glass',
+    'blend pineapple and water in a blender, add sugar, then pour into a bottle',
+    'pour boiling water into your favourite cup that has green tea leaves and sweetener',
+    'blend mango, yogurt, milk, and honey in a blender and serve into your favourite drinking glass',
+    'steep black tea in boiling water in a glass, blend blueberries and sugar in a blender, add the blueberry mixture to the glass, then serve with ice in the glass']
+
+    test_steps_list_drinks = [['transport frozen-strawberries to blender', 'transport yogurt to blender, pour honey to blender, pour milk to blender', 'pour mixture to glass', 'container(glass)'],
+    ['transport pineapple to blender', 'pour water to blender', 'transport sugar to blender', 'pour mixture to bottle', 'container(bottle)'],
+    ['transport green-tea-leaves to cup', 'pour boiling-water to cup', 'pour sweetener to cup', 'container(cup)'],
+    ['transport mango to blender', 'transport yogurt to blender, pour milk to blender, pour honey to blender', 'pour mixture to drinking-glass', 'container(drinking-glass)']
+    ['transport black-tea to glass', 'pour boiling-water to glass', 'transport blueberries to blender', 'pour sugar to blender', 'pour blueberry-mixture to glass' 'transport ice to glass', 'container(glass)']]
+    
     commands_list_foods = ["Make me a chicken sandwich please",
                            "I would appreciate it if you could prepare me a cheese sandwich",
                            "having a green salad would be great",
