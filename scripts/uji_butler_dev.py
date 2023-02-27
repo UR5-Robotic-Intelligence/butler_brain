@@ -41,6 +41,8 @@ class ButlerBrain():
     args.add_argument('-ur', '--use_reasoning', action='store_true', help='Use the reasoning to generate the robot commands')
     args.add_argument('-fse', '--from_saved_experiment', action='store_true', help='Use the saved experiment data to generate the robot commands')
     args.add_argument('-r', '--reversed', action='store_true', help='Use the reversed experiment data to generate the robot commands')
+    args.add_argument('-le', '--load_experiment_data', action='store_true', help='Load the experiment data from a file')
+    args.add_argument('-utd', '--use_test_data', action='store_true', help='Use the test data to generate the robot commands')
     self.verbose = args.parse_args().verbose
     self.load_embeddings = args.parse_args().load_embeddings
     self.save_embeddings = args.parse_args().save_embeddings
@@ -57,6 +59,8 @@ class ButlerBrain():
     self.use_reasoning = args.parse_args().use_reasoning
     self.from_saved_experiment = args.parse_args().from_saved_experiment
     self.reversed = args.parse_args().reversed
+    self.load_experiment_data = args.parse_args().load_experiment_data
+    self.use_test_data = args.parse_args().use_test_data
     # self.verbose = True
     # self.load_embeddings = False
     # self.save_embeddings = True
@@ -84,10 +88,10 @@ class ButlerBrain():
     self.new_prompts_path = os.path.join(os.getcwd(), f'new_prompts_at_{time_str}.txt')
     self.experiments_data_path = os.path.join(os.getcwd(), f'experiments_data_{exp_name}_at_{time_str}.pkl')
     self.new_triples_path = os.path.join(os.getcwd(), f'new_triples.pkl')
-    if self.from_saved_experiment:
-      exp_dir = '/home/bass/experiments/with both'
-      exp_dir = '/home/bass/experiments/effect_of_order'
-      exp_dir = '/home/bass'
+    if self.from_saved_experiment or self.load_experiment_data:
+      exp_dir = '/home/bass/experiments/with both/2'
+      # exp_dir = '/home/bass/experiments/effect_of_order'
+      # exp_dir = '/home/bass'
       experiment_file_names_list = glob.glob(os.path.join(exp_dir, f'experiments_data_{exp_name}_at_*.pkl'))
       if len(experiment_file_names_list) == 0:
             raise Exception('No saved experiments data found')
@@ -115,6 +119,8 @@ class ButlerBrain():
     rospy.Subscriber("/sign_command", String, self.sign_command_callback)
     self.sign_command = None
     self.experiments_data = {}
+    if self.load_experiment_data:
+      self.experiments_data = self.from_saved_experiment
     self.total_mistakes = 0
     self.reasoning_correction = 0
     self.reasoning_mistake_detection = 0
@@ -523,12 +529,12 @@ class ButlerBrain():
     'blend mango, yogurt, milk, and honey in a blender and serve into your favourite drinking glass',
     'steep black tea in boiling water in a glass, blend blueberries and sugar in a blender, add the blueberry mixture to the glass, then serve with ice in the glass']
 
-    test_steps_list_drinks = [['transport frozen-strawberries to blender', 'transport yogurt to blender, pour honey to blender, pour milk to blender', 'pour mixture to glass', 'container(glass)'],
+    test_steps_list_drinks = [['transport frozen-strawberries to blender', 'transport yogurt to blender', 'pour honey to blender', 'pour milk to blender', 'pour mixture to glass', 'container(glass)'],
     ['transport pineapple to blender', 'pour water to blender', 'transport sugar to blender', 'pour mixture to bottle', 'container(bottle)'],
     ['transport green-tea-leaves to cup', 'pour boiling-water to cup', 'pour sweetener to cup', 'container(cup)'],
-    ['transport mango to blender', 'transport yogurt to blender, pour milk to blender, pour honey to blender', 'pour mixture to drinking-glass', 'container(drinking-glass)']
-    ['transport black-tea to glass', 'pour boiling-water to glass', 'transport blueberries to blender', 'pour sugar to blender', 'pour blueberry-mixture to glass' 'transport ice to glass', 'container(glass)']]
-    
+    ['transport mango to blender', 'transport yogurt to blender', 'pour milk to blender', 'pour honey to blender', 'pour mixture to drinking-glass', 'container(drinking-glass)'],
+    ['transport black-tea to glass', 'pour boiling-water to glass', 'transport blueberries to blender', 'pour sugar to blender', 'pour blueberry-mixture to glass', 'transport ice to glass', 'container(glass)']]
+    test_rob_commands_list_drinks = list(filter(lambda x:self.gpt_string_commands_to_list("\n".join(x), use_gpt_string=False), test_steps_list_drinks))
     commands_list_foods = ["Make me a chicken sandwich please",
                            "I would appreciate it if you could prepare me a cheese sandwich",
                            "having a green salad would be great",
@@ -560,14 +566,23 @@ class ButlerBrain():
                                     "boil some water with onions, carrots, and tomatoes, then put chicken in the bowl",
                                     "put the steak on the plate, the add some potatoes, and onions, with some barbecue sauce on the side"]
     
-    drinks_data_list = list(zip(commands_list_drinks, output_components_list_drinks, output_name_list_drinks, steps_description_list_drinks, steps_list_drinks, rob_commands_list_drinks))
-    drinks_data_sorted = sorted(drinks_data_list, key=lambda x: len(x[3]), reverse=True)
-    drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in drinks_data_sorted]
-    foods_data_list = list(zip(commands_list_foods, output_components_list_foods, output_name_list_foods, steps_description_list_foods, steps_list_foods, rob_commands_list_foods))
-    foods_data_sorted = sorted(foods_data_list, key=lambda x: len(x[3]), reverse=True)
-    foods_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Food'} for x in foods_data_sorted]
-    data = drinks_data + foods_data
-    data = sorted(data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
+
+    if self.use_test_data:
+      test_drinks_data_list = list(zip(test_commands_list_drinks, test_output_components_list_drinks, test_output_name_list_drinks, test_steps_description_list_drinks, test_steps_list_drinks, test_rob_commands_list_drinks))
+      test_drinks_data_sorted = sorted(test_drinks_data_list, key=lambda x: len(x[3]), reverse=True)
+      test_drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in test_drinks_data_sorted]
+      test_data = test_drinks_data
+      data = sorted(test_data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
+    else:
+      drinks_data_list = list(zip(commands_list_drinks, output_components_list_drinks, output_name_list_drinks, steps_description_list_drinks, steps_list_drinks, rob_commands_list_drinks))
+      drinks_data_sorted = sorted(drinks_data_list, key=lambda x: len(x[3]), reverse=True)
+      drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in drinks_data_sorted]
+      foods_data_list = list(zip(commands_list_foods, output_components_list_foods, output_name_list_foods, steps_description_list_foods, steps_list_foods, rob_commands_list_foods))
+      foods_data_sorted = sorted(foods_data_list, key=lambda x: len(x[3]), reverse=True)
+      foods_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Food'} for x in foods_data_sorted]
+      data = drinks_data + foods_data
+      data = sorted(data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
+    
     for data_point in data:    
       # input("Press Enter to continue...")
       if not self.from_saved_experiment:
