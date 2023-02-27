@@ -1,2 +1,5 @@
 *.pyc
 *.vscode
+*.xlsx*
+*.pkl
+*.txt
