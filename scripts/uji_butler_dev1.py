@@ -40,7 +40,6 @@ class ButlerBrain():
     args.add_argument('-ut', '--use_type', action='store_true', help='Use the type (meal/drink) to generate the robot commands')
     args.add_argument('-ur', '--use_reasoning', action='store_true', help='Use the reasoning to generate the robot commands')
     args.add_argument('-fse', '--from_saved_experiment', action='store_true', help='Use the saved experiment data to generate the robot commands')
-    args.add_argument('-r', '--reversed', action='store_true', help='Use the reversed experiment data to generate the robot commands')
     self.verbose = args.parse_args().verbose
     self.load_embeddings = args.parse_args().load_embeddings
     self.save_embeddings = args.parse_args().save_embeddings
@@ -56,7 +55,6 @@ class ButlerBrain():
     self.use_type = args.parse_args().use_type
     self.use_reasoning = args.parse_args().use_reasoning
     self.from_saved_experiment = args.parse_args().from_saved_experiment
-    self.reversed = args.parse_args().reversed
     # self.verbose = True
     # self.load_embeddings = False
     # self.save_embeddings = True
@@ -77,7 +75,6 @@ class ButlerBrain():
     exp_name += '_use_experience' if self.use_experience else ''
     exp_name += '_use_type' if self.use_type else ''
     exp_name += '_use_reasoning' if self.use_reasoning else ''
-    exp_name += '_reversed' if self.reversed else ''
     self.data_path = os.path.join(os.getcwd(), f'uji_butler_wokring_memory_at_{time_str}.txt')
     self.query_results_path = os.path.join(os.getcwd(), f'query_results_at_{time_str}.pkl')
     self.new_activities_path = os.path.join(os.getcwd(), f'new_activities_at_{time_str}.pkl')
@@ -86,8 +83,6 @@ class ButlerBrain():
     self.new_triples_path = os.path.join(os.getcwd(), f'new_triples.pkl')
     if self.from_saved_experiment:
       exp_dir = '/home/bass/experiments/with both'
-      exp_dir = '/home/bass/experiments/effect_of_order'
-      exp_dir = '/home/bass'
       experiment_file_names_list = glob.glob(os.path.join(exp_dir, f'experiments_data_{exp_name}_at_*.pkl'))
       if len(experiment_file_names_list) == 0:
             raise Exception('No saved experiments data found')
@@ -117,57 +112,37 @@ class ButlerBrain():
     self.experiments_data = {}
     self.total_mistakes = 0
     self.reasoning_correction = 0
-    self.reasoning_mistake_detection = 0
-    self.human_intervention = 0
   
   def sign_command_callback(self, msg):
     self.sign_command = msg.data
-  
-  def reasoning_subclass_of(self, entity, entity_type, transitive=True):
-    A = f"{self.ns}{entity}\""
-    if transitive:
-      query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}{entity_type}\")."
-    else:
-      query_str = f"subclass_of({A},{self.ns}{entity_type}\")."
-    query = self.prolog.query(query_str)
-    Found = False
-    for solution in query.solutions():
-      Found = True
-    return Found
-  
-  def reasoning_verification(self, entity, entity_type, true_entity, act_name, transitive=True):
-    Found = self.reasoning_subclass_of(entity, entity_type, transitive=transitive)
-    correct = True
-    if not Found:
-      # Asks the user to correct the container
-      if entity != true_entity:
-        correct = False
-        print(f"corrected the {entity_type} using reasoning from {entity} to {true_entity}")
-        self.reasoning_mistake_detection += 1
-        self.reasoning_correction += 1
-        self.human_intervention += 1
-        self.experiments_data[act_name]['reasoning_correction'].append(f"{entity_type}_correction({entity}, {true_entity})")
-        self.experiments_data[act_name]['human_intervention'].append(f"{entity_type}_correction({entity}, {true_entity})")
-        self.experiments_data[act_name]['reasoning_mistake_detection'].append(f"{entity_type}_correction({entity}, {true_entity})")
-        entity = true_entity
-    return correct
     
-  def gpt_string_commands_to_list(self, gpt_string, return_components=False, use_gpt_string=True,
-                                  act_type=None, act_name=None, true_container=None, true_cmds=None):
+  def gpt_string_commands_to_list(self, gpt_string, return_components=False, use_gpt_string=True, act_type=None, act_name=None):
     gpt_string = gpt_string.strip().strip().split("\n")
     # print("gpt_string: ", gpt_string)    
     container = gpt_string[-1][10:-1]
     if use_gpt_string:
-      self.experiments_data[act_name].setdefault('reasoning_correction', [])
-      self.experiments_data[act_name].setdefault('human_intervention', [])
-      self.experiments_data[act_name].setdefault('reasoning_mistake_detection', [])
-      
+      if 'reasoning_correction' not in self.experiments_data[act_name].keys():
+        self.experiments_data[act_name]['reasoning_correction'] = []
     if self.use_type and use_gpt_string and self.use_reasoning:
-      vessel_type = "EatingVessel" if act_type == "Food" else "DrinkingVessel"
-      correct = self.reasoning_verification(container, vessel_type, true_container, act_name)
-      if not correct:
-        gpt_string = [cmd.replace(container, true_container) for cmd in gpt_string]
-        container = true_container
+      A = f"{self.ns}{container}\""
+      if act_type == "Food":
+        query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}DrinkingVessel\")."
+        query = self.prolog.query(query_str)
+        for solution in query.solutions():
+          print(f"corrected container using reasoning from {container} to plate")
+          self.reasoning_correction += 1
+          self.experiments_data[act_name]['reasoning_correction'].append(f"container_correction({container}, plate)")
+          gpt_string = [cmd.replace(container, "plate") for cmd in gpt_string]
+          container = "plate"
+      else:
+        query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}EatingVessel\")."
+        query = self.prolog.query(query_str)
+        for solution in query.solutions():
+          print(f"corrected container using reasoning from {container} to cup")
+          self.reasoning_correction += 1
+          self.experiments_data[act_name]['reasoning_correction'].append(f"container_correction({container}, cup)")
+          gpt_string = [cmd.replace(container, "cup") for cmd in gpt_string]
+          container = "cup"
     new_gpt_string = deepcopy(gpt_string)
     output_components = []
     rob_commands = []
@@ -180,33 +155,36 @@ class ButlerBrain():
         func_name = step.split(" to ")[0].split(" ")[0]
         input_args = [step.split(" to ")[0].split(" ")[1].strip()]
         A = f"{self.ns}{input_args[0]}\""
-        comp_type = "LiquidTangibleThing" if func_name == "pour" else "SolidTangibleThing"
-        self.new_info.append(f"subclass_of({A}, {self.ns}{comp_type}\")")
+        if func_name == "pour":
+          self.new_info.append(f"subclass_of({A}, {self.ns}LiquidTangibleThing\")")
+        elif func_name == "transport":
+          self.new_info.append(f"subclass_of({A}, {self.ns}SolidTangibleThing\")")
         input_args.append(step.split(" to ")[1].strip())          
       else:
         step = step.split(".")[-1].strip()
         func_name = step.split("(")[0]
         input_args = step.split("(")[1].split(")")[0].split(",")
-        input_args = [arg.strip() for arg in input_args]
-        if self.use_reasoning: # Use reasoning to correct the command
-          comp_wrong_type = "LiquidTangibleThing" if func_name != "pour" else "SolidTangibleThing"
-          correction = "pour" if func_name != "pour" else "transport"
-          if self.reasoning_subclass_of(input_args[0], comp_wrong_type):
-            print(f"corrected command using reasoning from {func_name} to {correction}")
+        if func_name != "pour" and self.use_reasoning:
+          A = f"{self.ns}{input_args[0]}\""
+          query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}LiquidTangibleThing\")."
+          query = self.prolog.query(query_str)
+          for solution in query.solutions():
+            print("corrected command using reasoning from transport to pour")
             self.reasoning_correction += 1
-            self.experiments_data[act_name]['reasoning_correction'].append(f"action_correction({func_name}, {correction})")
-            new_gpt_string[i] = new_gpt_string[i].replace(func_name, correction)
-            func_name = correction
-          # else:
-          #   comp_type = "LiquidTangibleThing" if func_name == "pour" else "SolidTangibleThing"
-          #   if not self.reasoning_subclass_of(input_args[0], comp_type):
-          #     predicted_cmd = (func_name, input_args[0])
-          #     if predicted_cmd not in [cmd[:2] for cmd in true_cmds]:
-          #       self.reasoning_mistake_detection += 1
-          #       self.experiments_data[act_name]['reasoning_mistake_detection'].append(f"action_correction({func_name}, {correction})")
-          #       print(f"mistake in reasoning for {func_name}({input_args[0]})")
-          
-
+            self.experiments_data[act_name]['reasoning_correction'].append(f"action_correction({func_name}, pour)")
+            func_name = "pour"
+            new_gpt_string[i] = new_gpt_string[i].replace("transport", "pour")
+        elif func_name == "pour" and self.use_reasoning:
+          A = f"{self.ns}{input_args[0]}\""
+          query_str = f"holds({A},transitive(rdfs:subClassOf),{self.ns}SolidTangibleThing\")."
+          query = self.prolog.query(query_str)
+          for solution in query.solutions():
+            print("corrected command using reasoning from pour to transport")
+            self.reasoning_correction += 1
+            self.experiments_data[act_name]['reasoning_correction'].append(f"action_correction({func_name}, transport)")
+            func_name = "transport"
+            new_gpt_string[i] = new_gpt_string[i].replace("pour", "transport")
+          input_args = [arg.strip() for arg in input_args]
       if len(input_args) == 2:
         steps.append(f"{func_name} {input_args[0]} to {input_args[1]}")
         rob_commands.append((func_name, input_args[0], input_args[1]))
@@ -345,12 +323,11 @@ class ButlerBrain():
     #       4.also the func_name needs to be checked for existence as a capability, if not, find a way to automatically define it,
     #         and ask user for any missing or needed information.
     #       5.Find how to add these to the ontology. (would help in the reasoning)
+    rob_commands, output_components, container, steps, func_name, res = self.gpt_string_commands_to_list(res, return_components=True,
+                                                                                                         act_type=type_txt, act_name=act_name)
     label_rob_commands, output_components, container, steps, func_name, _= self.gpt_string_commands_to_list("\n".join(data_point['steps']),
                                                                                                          use_gpt_string=False, return_components=True,
                                                                                                          act_type=type_txt, act_name=act_name)
-    rob_commands, _, _, _, _, res = self.gpt_string_commands_to_list(res, return_components=True,
-                                                                     act_type=type_txt, act_name=act_name,
-                                                                     true_container=container, true_cmds=label_rob_commands)
     self.experiments_data[act_name]['rob_commands'] = rob_commands
     self.experiments_data[act_name]['reasoning_corrections'] = self.reasoning_correction
     
@@ -398,13 +375,6 @@ class ButlerBrain():
       self.new_info.append(f"is_restriction({R}, some({self.ns}outputsCreated\",{C}))")
       self.new_info.append(f"subclass_of({B},{R})")
       self.new_info.append(f"subclass_of({C},{Sc})")
-      for cmd in label_rob_commands:
-        func_name = cmd[0]
-        ARG = f"{self.ns}{cmd[1]}\"" # arg1
-        if func_name == 'transport':
-          self.new_info.append(f"subclass_of({ARG},{self.ns}SolidTangibleThing\")")
-        elif func_name == 'pour':
-          self.new_info.append(f"subclass_of({ARG},{self.ns}LiquidTangibleThing\")")
       for com in output_components:
         R_i = f"{self.ns}{act_name}_objectActedOn_{com}\""
         E = f"{self.ns}{com}\""
@@ -530,13 +500,12 @@ class ButlerBrain():
                                     "put the steak on the plate, the add some potatoes, and onions, with some barbecue sauce on the side"]
     
     drinks_data_list = list(zip(commands_list_drinks, output_components_list_drinks, output_name_list_drinks, steps_description_list_drinks, steps_list_drinks, rob_commands_list_drinks))
-    drinks_data_sorted = sorted(drinks_data_list, key=lambda x: len(x[3]), reverse=True)
+    drinks_data_sorted = sorted(drinks_data_list, key=lambda x: len(x[3]))
     drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in drinks_data_sorted]
     foods_data_list = list(zip(commands_list_foods, output_components_list_foods, output_name_list_foods, steps_description_list_foods, steps_list_foods, rob_commands_list_foods))
-    foods_data_sorted = sorted(foods_data_list, key=lambda x: len(x[3]), reverse=True)
+    foods_data_sorted = sorted(foods_data_list, key=lambda x: len(x[3]))
     foods_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Food'} for x in foods_data_sorted]
     data = drinks_data + foods_data
-    data = sorted(data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
     for data_point in data:    
       # input("Press Enter to continue...")
       if not self.from_saved_experiment:
