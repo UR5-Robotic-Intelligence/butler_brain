@@ -42,5 +42,5 @@ roslaunch rosprolog rosprolog.launch initial_package=knowrob
 ```
 ## In a new terminal:
 ```
-rosrun owl_test test_prolog_service.py
+rosrun butler_brain butler_brain.py
 ```
