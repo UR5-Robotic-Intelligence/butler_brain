@@ -1,6 +1,6 @@
 # ButlerBrain
 
-A Repo to test using ontologies like knowrob with deeplearning in robotics.
+Combining Knowledge Base Reasoning Systems like Knowrob with Deeplearning for improving Robot Cognition, Learning and Human-Robot Interaction.
 
 [Demonstration Video](https://youtube.com/playlist?list=PLKYWqKMe8hVKP9UAvhe-WZa0OisrNtL-v)
 
