@@ -20,6 +20,18 @@ experiment_names = ['from_description_and_request_use_experience',
                     'from_description_and_request_use_type',
                     'from_description_use_type',
                     'from_request_use_type']
+# experiment_names = ['from_description_and_request_use_experience',
+#                     'from_description_use_experience',
+#                     'from_request_use_experience',
+#                     'from_description_and_request_use_experience_use_type',
+#                     'from_description_use_experience_use_type',
+#                     'from_request_use_experience_use_type',
+#                     'from_description_and_request',
+#                     'from_description',            
+#                     'from_request',
+#                     'from_description_and_request_use_type',
+#                     'from_description_use_type',
+#                     'from_request_use_type']
 figure_titles = ['(experience and type)',
                  '(experience)',
                  '(type)',
@@ -33,8 +45,9 @@ figure_titles = ['(experience and type)',
                  '(type)',
                  'No Additional Information']
 
-def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys=False):
+def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys=False, sort_by='fuzzy_score'):
   experiments_data = {}
+  avg_scores = {}
   for i, core_experiment_name in enumerate(experiment_names):
       for j, cond in enumerate(['_use_reasoning', '']):
         experiment_name = core_experiment_name + cond
@@ -47,11 +60,25 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys
         exp_file_name = os.path.join(data_dir,f'experiments_data_{experiment_name}_at_{max(all_exp_dt_str)}.pkl')
         with open(exp_file_name, 'rb') as f:
             experiment = pickle.load(f)
+        n = 0
+        avg_scores[experiment_name] = {'fuzzy_score':0,'n_mistakes':0,'bert_score':0}
         for k, v in experiment.items():
             if 'n_mistakes' not in v:
                 v['n_mistakes'] = 0
-            v['n_mistakes'] /= len(v['rob_commands']) 
+            v['n_mistakes'] /= len(v['rob_commands'])
+            avg_scores[experiment_name]['fuzzy_score'] += v['fuzzy_score']
+            avg_scores[experiment_name]['n_mistakes'] += v['n_mistakes']
+            avg_scores[experiment_name]['bert_score'] += v['bert_score'][-1]
+            n += 1
+        avg_scores[experiment_name]['fuzzy_score'] /= n
+        avg_scores[experiment_name]['n_mistakes'] /= n
+        avg_scores[experiment_name]['bert_score'] /=n
+        
         experiments_data[experiment_name] = experiment
+  if sort_keys:
+    keys = list(experiments_data.keys())
+    reverse = True if sort_by == 'n_mistakes' else False
+    experiments_data = {k: experiments_data[k] for k in sorted(keys,key=lambda x: avg_scores[x][sort_by],reverse=reverse)}
   return experiments_data
 
 def filter_experiment_data(experiments_data, all_of=[''], any_of=[''], none_of=[]):
@@ -78,7 +105,7 @@ def dict_to_excel(experiment, experiment_name):
   # print(df)
   df.to_excel('experiment_{}.xlsx'.format(experiment_name), index=True)
 
-def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with both/2', input_type='', score_type='n_mistakes', plot=True, sort_keys=False):
+def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with both/2', input_type='', score_type='n_mistakes', plot=True, sort_keys=False, sort_by=None):
   
   if input_type == 'description':
     none_of = ['request']
@@ -87,7 +114,7 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   else:
     none_of = []
   
-  experiments_data = get_experiment_data()
+  experiments_data = get_experiment_data(sort_by=sort_by, sort_keys=sort_keys, data_dir=data_dir)
   all_exps = []
   experiments_1 = filter_experiment_data(experiments_data, all_of=[f'from_{input_type}', 'reasoning'], none_of=none_of)
   all_exps.append(experiments_1)
@@ -132,15 +159,21 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   color = ['blue', 'red', 'green', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
   title = 'Reasoning vs No Reasoning' if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
   x_label = f'Additional Information (All have activity {input_type})' if input_type != '' else 'Additional Information'
+  x_ticks = []
   if input_type != '':
     x_ticks = [name.replace(f'from_{input_type}_use_','').replace('use','and').replace(f'from_{input_type}','nothing') for name in experiments_2.keys()]
   else:
     p4 = 'from_description'
     p6 = 'from_request'
     p2 = 'from_description_and_request'
-    p1, p3, p5 = p2 + '_use_', p4 + '_use_', p6 + '_use_'
-    
-    x_ticks = [re.sub(f'({p1})|({p2})|({p3})|({p4})|({p5})|({p6})','',name).replace('_use_reasoning','').replace('_use_',',') for name in all_exps[0].keys()]
+    p1, p3, p5 = p2 + '_use', p4 + '_use', p6 + '_use'
+    for name in all_exps[0].keys():
+      name = re.sub(f'({p1})|({p2})','d&r',name)
+      name = re.sub(f'({p3})|({p4})','d',name)
+      name = re.sub(f'({p5})|({p6})','r',name)
+      name = name.replace('_use_reasoning','').replace('_use_','_').replace('reasoning','none')
+      name = name.replace('experience','exp')
+      x_ticks.append(name)
   y_label = 'Number of Mistakes' if score_type == 'n_mistakes' else 'Fuzzy Score'
   bottom = 90 if score_type == 'fuzzy_score' else 0
   name = f'{title}_using_{score_type}'
@@ -149,8 +182,9 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   ax = plt.gca()
   ax.set_xlabel(f'{x_label}', fontsize=fs, fontweight='bold')
   l = 0
-  regions = 'input_types'
-  regions = 'additional_info_types'
+  # regions = 'input_types'
+  # regions = 'additional_info_types'
+  regions = ''
   alpha = 0.3
   if regions == 'input_types':
     ax.axvspan(0, 4, color='red', alpha=alpha, label='Description & Request')
@@ -168,12 +202,12 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
     reverse = False if score_type_ == 'fuzzy_score' else True
     if sc_i == 1:
       ax = ax.twinx()
-    if sort_keys:
-      for i in range(len(all_exps)):
-        sorted_indices = np.argsort(experiment_scores[i])
-        sorted_indices = np.flip(sorted_indices) if reverse else sorted_indices
-        experiment_scores[i] = [experiment_scores[i][j] for j in sorted_indices]
-        experiment_names[i] = [experiment_names[i][j] for j in sorted_indices]
+    # if sort_keys:
+    #   for i in range(len(all_exps)):
+    #     sorted_indices = np.argsort(experiment_scores[i])
+    #     sorted_indices = np.flip(sorted_indices) if reverse else sorted_indices
+    #     experiment_scores[i] = [experiment_scores[i][j] for j in sorted_indices]
+    #     experiment_names[i] = [experiment_names[i][j] for j in sorted_indices]
     if bar_plot:
       bars_per_tick = len(all_exps) # reasoning vs no reasoning
       w = 0.5
@@ -223,11 +257,12 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   plt.show()
 
 if __name__ == '__main__':
-  data_dir = '/home/bass/experiments/with both/2'
+  # data_dir = '/home/bass/experiments/with both/2'
+  data_dir = '/home/bass/experiments/on_test_set/2'
   # input_type = 'request'
   # input_type = 'description'
   # input_type = 'description_and_request'
   input_type = ''
   score_type = ['n_mistakes', 'fuzzy_score']
   # score_type = 'fuzzy_score'
-  analyze_experiments(data_dir=data_dir, input_type=input_type, score_type=score_type, plot=True, bar_plot=False)
+  analyze_experiments(data_dir=data_dir, input_type=input_type, score_type=score_type, plot=True, bar_plot=False, sort_keys=True, sort_by='fuzzy_score')

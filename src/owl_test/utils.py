@@ -503,7 +503,7 @@ def gpt(text, prompt_to_use='text_to_keywords', new_prompt="", verbose=False):
     engine="code-cushman-001",
     prompt=prompt+"Q:" + text + ":",
     temperature=0,
-    max_tokens=70,
+    max_tokens=80,
     top_p=0.1,
     n=1,
     stream=False,

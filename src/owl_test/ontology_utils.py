@@ -1,4 +1,4 @@
-from owl_test.utils import text_to_speech, speach_to_text, get_top_matching_candidate
+from butler_brain.utils import text_to_speech, speach_to_text, get_top_matching_candidate
 from rosprolog_client import Prolog
 
 

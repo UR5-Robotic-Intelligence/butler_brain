@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import rospy
-from owl_test.robot_activities import RobotActivities
-from owl_test.utils import text_to_speech, gpt, speach_to_text, get_top_matching_candidate, cos_sim, write_embeddings, tell_me_one_of
-from owl_test.ontology_utils import OntologyUtils
+from butler_brain.robot_activities import RobotActivities
+from butler_brain.utils import text_to_speech, gpt, speach_to_text, get_top_matching_candidate, cos_sim, write_embeddings, tell_me_one_of
+from butler_brain.ontology_utils import OntologyUtils
 import argparse
 import os
 from sentence_transformers import SentenceTransformer

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from owl_test.robot_action_primitives import RobotActionPrimitives
-from owl_test.utils import text_to_speech, speach_to_text, get_top_matching_candidate, tell_me_one_of
+from butler_brain.robot_action_primitives import RobotActionPrimitives
+from butler_brain.utils import text_to_speech, speach_to_text, get_top_matching_candidate, tell_me_one_of
 import rospy
 import re
 from std_msgs.msg import Empty
