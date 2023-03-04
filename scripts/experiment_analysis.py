@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import re
+from copy import deepcopy
 
 
 experiment_names = ['from_description_and_request_use_experience',
@@ -61,7 +62,7 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys
         with open(exp_file_name, 'rb') as f:
             experiment = pickle.load(f)
         n = 0
-        avg_scores[experiment_name] = {'fuzzy_score':0,'n_mistakes':0,'bert_score':0}
+        avg_scores[experiment_name] = {'fuzzy_score':0,'n_mistakes':0,'bert_score':0, 'prompt_length':0}
         for k, v in experiment.items():
             if 'n_mistakes' not in v:
                 v['n_mistakes'] = 0
@@ -69,10 +70,10 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys
             avg_scores[experiment_name]['fuzzy_score'] += v['fuzzy_score']
             avg_scores[experiment_name]['n_mistakes'] += v['n_mistakes']
             avg_scores[experiment_name]['bert_score'] += v['bert_score'][-1]
+            avg_scores[experiment_name]['prompt_length'] += sum([len(v1) for k1, v1 in v.items() if k1.endswith('prompt')]) / len(v['rob_commands'])
             n += 1
-        avg_scores[experiment_name]['fuzzy_score'] /= n
-        avg_scores[experiment_name]['n_mistakes'] /= n
-        avg_scores[experiment_name]['bert_score'] /=n
+        for k, v in avg_scores[experiment_name].items():
+            avg_scores[experiment_name][k] /= n
         
         experiments_data[experiment_name] = experiment
   if sort_keys:
@@ -81,7 +82,7 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys
     experiments_data = {k: experiments_data[k] for k in sorted(keys,key=lambda x: avg_scores[x][sort_by],reverse=reverse)}
   return experiments_data
 
-def filter_experiment_data(experiments_data, all_of=[''], any_of=[''], none_of=[]):
+def filter_experiments(experiments_data, all_of=[''], any_of=[''], none_of=[]):
   experiment_cond = lambda x: all([a in x for a in all_of]) and all([a not in x for a in none_of]) and any([a in x for a in any_of])
   filtered_experiments_data = {}
   for experiment_name, experiment_data in experiments_data.items():
@@ -105,21 +106,32 @@ def dict_to_excel(experiment, experiment_name):
   # print(df)
   df.to_excel('experiment_{}.xlsx'.format(experiment_name), index=True)
 
-def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with both/2', input_type='', score_type='n_mistakes', plot=True, sort_keys=False, sort_by=None):
+def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with both/2', must_have=[''], none_of=[], input_type='', use_activities=False, score_type='n_mistakes', compare_by='reasoning', plot=True, sort_keys=False, sort_by=None):
   
   if input_type == 'description':
-    none_of = ['request']
+    none_of += ['request']
   elif input_type == 'request':
-    none_of = ['description']
+    none_of += ['description']
   else:
-    none_of = []
+    none_of += []
   
   experiments_data = get_experiment_data(sort_by=sort_by, sort_keys=sort_keys, data_dir=data_dir)
   all_exps = []
-  experiments_1 = filter_experiment_data(experiments_data, all_of=[f'from_{input_type}', 'reasoning'], none_of=none_of)
+  experiments_1 = filter_experiments(experiments_data, all_of=[f'from_{input_type}', compare_by]+must_have, none_of=none_of)
   all_exps.append(experiments_1)
-  experiments_2 = filter_experiment_data(experiments_data, all_of=[f'from_{input_type}'], none_of=none_of+['reasoning'])
+  experiments_2 = filter_experiments(experiments_data, all_of=[f'from_{input_type}']+must_have, none_of=none_of+[compare_by])
   all_exps.append(experiments_2)
+  
+  # Restructure data
+  if use_activities:
+    all_exps_cp = deepcopy(all_exps)
+    for i, exps in enumerate(all_exps_cp):
+      new_experiment_dict = {k: {} for k in list(experiments_1.values())[0].keys()}
+      for exp_name, exp_data in exps.items():
+        for act_name, act_data in exp_data.items():
+          new_experiment_dict[act_name].update({exp_name:act_data})
+      all_exps[i] = new_experiment_dict
+  
   
   # experiment_1 vs experiment_2 in terms of score
   experiment_scores_dict = {}
@@ -149,19 +161,21 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
 
   fs = 20
   tfs = 15
-  rotation = 0 if input_type != '' else 90
-  fig_titles = ['With Reasoning', 'No Reasoning']
+  # rotation = 0 if input_type != '' else 90
+  rotation = 90
+  fig_titles = [f'With {compare_by}', f'No {compare_by}']
   new_fig_titles = []
   for score_type_ in score_type:
     for i,ft in enumerate(fig_titles):
       new_fig_titles.append(f'{ft} ({score_type_})')
   fig_titles = new_fig_titles
   color = ['blue', 'red', 'green', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
-  title = 'Reasoning vs No Reasoning' if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
+  title = f'{compare_by} vs No {compare_by}' if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
   x_label = f'Additional Information (All have activity {input_type})' if input_type != '' else 'Additional Information'
+  x_label += f' (sorted by {sort_by})' if sort_by is not None else ''
   x_ticks = []
   if input_type != '':
-    x_ticks = [name.replace(f'from_{input_type}_use_','').replace('use','and').replace(f'from_{input_type}','nothing') for name in experiments_2.keys()]
+    x_ticks = [name.replace(f'from_{input_type}_use_','').replace('use','and').replace(f'from_{input_type}','nothing') for name in all_exps[1].keys()]
   else:
     p4 = 'from_description'
     p6 = 'from_request'
@@ -171,13 +185,22 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
       name = re.sub(f'({p1})|({p2})','d&r',name)
       name = re.sub(f'({p3})|({p4})','d',name)
       name = re.sub(f'({p5})|({p6})','r',name)
-      name = name.replace('_use_reasoning','').replace('_use_','_').replace('reasoning','none')
+      name = name.replace(f'_use_{compare_by}','').replace('_use_','_').replace(f'_{compare_by}','')
+      for nn in none_of:
+        name = name.replace(f'_{nn}','')
+      for mh in must_have:
+        name = name.replace(f'_{mh}','')
       name = name.replace('experience','exp')
       x_ticks.append(name)
   y_label = 'Number of Mistakes' if score_type == 'n_mistakes' else 'Fuzzy Score'
   bottom = 90 if score_type == 'fuzzy_score' else 0
   name = f'{title}_using_{score_type}'
   name += f'_and_{input_type}' if input_type != '' else ''
+  name += f'_comparing_by_{compare_by}' if compare_by != '' else ''
+  name += f'_activities' if use_activities else ''
+  name += f'_sorted_by_{sort_by}' if sort_by is not None else ''
+  name += f'_have_{must_have}' if must_have != [''] else ''
+  name += f'_without_{none_of}' if none_of != [] else ''
   name += '.png'
   ax = plt.gca()
   ax.set_xlabel(f'{x_label}', fontsize=fs, fontweight='bold')
@@ -202,12 +225,6 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
     reverse = False if score_type_ == 'fuzzy_score' else True
     if sc_i == 1:
       ax = ax.twinx()
-    # if sort_keys:
-    #   for i in range(len(all_exps)):
-    #     sorted_indices = np.argsort(experiment_scores[i])
-    #     sorted_indices = np.flip(sorted_indices) if reverse else sorted_indices
-    #     experiment_scores[i] = [experiment_scores[i][j] for j in sorted_indices]
-    #     experiment_names[i] = [experiment_names[i][j] for j in sorted_indices]
     if bar_plot:
       bars_per_tick = len(all_exps) # reasoning vs no reasoning
       w = 0.5
@@ -257,12 +274,14 @@ def analyze_experiments(bar_plot=True, data_dir='/home/bass/experiments/with bot
   plt.show()
 
 if __name__ == '__main__':
-  # data_dir = '/home/bass/experiments/with both/2'
   data_dir = '/home/bass/experiments/on_test_set/2'
+  # data_dir = '/home/bass/experiments/with both/2'
+  input_type = ''
   # input_type = 'request'
   # input_type = 'description'
   # input_type = 'description_and_request'
-  input_type = ''
-  score_type = ['n_mistakes', 'fuzzy_score']
-  # score_type = 'fuzzy_score'
-  analyze_experiments(data_dir=data_dir, input_type=input_type, score_type=score_type, plot=True, bar_plot=False, sort_keys=True, sort_by='fuzzy_score')
+  # score_type = ['n_mistakes', 'fuzzy_score']
+  score_type = 'fuzzy_score'
+  analyze_experiments(data_dir=data_dir, input_type=input_type, score_type=score_type,
+                      use_activities=False, compare_by='experience', must_have=[''], none_of=['reasoning'],
+                      plot=True, bar_plot=False, sort_keys=True, sort_by='fuzzy_score')
