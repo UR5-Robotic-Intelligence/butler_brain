@@ -1,0 +1,32 @@
+<launch>
+  <arg name="initial_package" default="knowrob" />
+  <arg name="initial_goal" default="true" />
+  <arg name="num_pl_threads" default="2" />
+  <arg name="num_ros_threads" default="4" />
+  
+  <param name="initial_package" type="string" value="$(arg initial_package)" />
+  <param name="initial_goal" type="string" value="$(arg initial_goal)" />
+  
+  <param name="num_pl_threads" type="int" value="$(arg num_pl_threads)" />
+  <param name="num_ros_threads" type="int" value="$(arg num_ros_threads)" />
+  
+  <node name="rosprolog" pkg="rosprolog" type="rosprolog_node" cwd="node" output="screen" />
+  
+  <node name="json_wrapper" pkg="rosprolog" type="json_ros.py" output="screen"/> 
+
+  <arg name="l" default="-l" />
+  <arg name="lq" default="-lq" />
+  <arg name="ld" default="-ld" />
+  <arg name="sa" default="-sa" />
+  <arg name="se" default="-se" />
+  <arg name="v" default="-v" />
+  <arg name="e" default="" />
+  <arg name="ue" default="" />
+  <arg name="ut" default="" />
+  <arg name="ur" default="" />
+  <arg name="utd" default="" />
+  <arg name="le" default="" />
+  <arg name="fse" default=""/>
+
+  <node name="main" pkg="butler_brain" type="main.py" output="screen" args="$(arg l) $(arg lq) $(arg ld) $(arg sa) $(arg se) $(arg v) $(arg e) $(arg ue) $(arg ut) $(arg ur) $(arg utd) $(arg le) $(arg fse)" />
+</launch>

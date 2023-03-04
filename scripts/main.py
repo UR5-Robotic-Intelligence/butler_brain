@@ -19,11 +19,26 @@ import bert_score
 import re
 import json
 import glob
+import sys
+import numpy as np
+
+
+def get_most_recent_filename(exp_dir=os.getcwd(),prefix='experiments_data_exp_name'):
+  experiment_file_names_list = glob.glob(os.path.join(exp_dir, f'{prefix}_at_*.pkl'))
+  if len(experiment_file_names_list) == 0:
+        raise Exception('No saved experiments data found')
+  all_exp_dt_str = [file_name.split('_at_')[1].split('.')[0] for file_name in experiment_file_names_list]
+  all_exp_dt_str = list(filter(lambda x: dt.strptime(x, '%Y%m%d-%H%M%S'), all_exp_dt_str))
+  exp_file_name = f'{prefix}_at_{max(all_exp_dt_str)}.pkl'
+  exp_file_name = os.path.join(exp_dir, exp_file_name)
+  return exp_file_name
 
 
 class ButlerBrain():
   def __init__(self) -> None:
-    rospy.init_node('test_rosprolog')
+    rospy.init_node('butler_brain',argv=sys.argv)
+    sys.argv = rospy.myargv(argv=sys.argv)
+    rospy.on_shutdown(self.brain_shutdown)
     args = argparse.ArgumentParser(description='Test the rosprolog service')
     args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
     args.add_argument('-s', '--save_embeddings', action='store_true', help='Save the query embeddings to a file')
@@ -43,36 +58,28 @@ class ButlerBrain():
     args.add_argument('-r', '--reversed', action='store_true', help='Use the reversed experiment data to generate the robot commands')
     args.add_argument('-le', '--load_experiment_data', action='store_true', help='Load the experiment data from a file')
     args.add_argument('-utd', '--use_test_data', action='store_true', help='Use the test data to generate the robot commands')
-    self.verbose = args.parse_args().verbose
-    self.load_embeddings = args.parse_args().load_embeddings
-    self.save_embeddings = args.parse_args().save_embeddings
-    self.load_query_results = args.parse_args().load_query_results
-    self.save_query_results = args.parse_args().save_query_results
-    self.load_activities = args.parse_args().load_activities
-    self.save_activites = args.parse_args().save_activites
-    load_manip_data = args.parse_args().load_manip_data
-    save_manip_data = args.parse_args().save_manip_data
-    self.save_experiments_data = args.parse_args().save_experiments_data
-    self.exp = args.parse_args().exp
-    self.use_experience = args.parse_args().use_experience
-    self.use_type = args.parse_args().use_type
-    self.use_reasoning = args.parse_args().use_reasoning
-    self.from_saved_experiment = args.parse_args().from_saved_experiment
-    self.reversed = args.parse_args().reversed
-    self.reversed = True
-    self.load_experiment_data = args.parse_args().load_experiment_data
-    self.use_test_data = args.parse_args().use_test_data
-    # self.verbose = True
-    # self.load_embeddings = False
-    # self.save_embeddings = True
-    # self.load_query_results = False
-    # self.save_query_results = True
-    # self.load_activities = False
-    # self.save_activites = True
-    load_manip_data = args.parse_args().load_manip_data
-    save_manip_data = args.parse_args().save_manip_data
-    # self.save_experiments_data = True
+    parsed_args = args.parse_args()
+    self.verbose = parsed_args.verbose
+    self.load_embeddings = parsed_args.load_embeddings
+    self.save_embeddings = parsed_args.save_embeddings
+    self.load_query_results = parsed_args.load_query_results
+    self.save_query_results = parsed_args.save_query_results
+    self.load_activities = parsed_args.load_activities
+    self.save_activites = parsed_args.save_activites
+    load_manip_data = parsed_args.load_manip_data
+    save_manip_data = parsed_args.save_manip_data
+    self.save_experiments_data = parsed_args.save_experiments_data
+    self.exp = parsed_args.exp
+    self.use_experience = parsed_args.use_experience
+    self.use_type = parsed_args.use_type
+    self.use_reasoning = parsed_args.use_reasoning
+    self.from_saved_experiment = parsed_args.from_saved_experiment
+    self.reversed = parsed_args.reversed
+    self.load_experiment_data = parsed_args.load_experiment_data
+    self.use_test_data = parsed_args.use_test_data
+    
     # self.ra = RobotActivities(load_data=load_manip_data, save_data=save_manip_data, verbose=self.verbose)
+
     ou = OntologyUtils()
     self.prolog = ou.prolog
     self.ns = ou.ns
@@ -82,51 +89,70 @@ class ButlerBrain():
     exp_name += '_use_experience' if self.use_experience else ''
     exp_name += '_use_type' if self.use_type else ''
     exp_name += '_use_reasoning' if self.use_reasoning else ''
-    if not self.load_experiment_data:
-      exp_name += '_reversed' if self.reversed else ''
+    exp_name += '_reversed' if self.reversed else ''
+    os.chdir(os.environ['HOME'])
     self.data_path = os.path.join(os.getcwd(), f'uji_butler_wokring_memory_at_{time_str}.txt')
     self.query_results_path = os.path.join(os.getcwd(), f'query_results_at_{time_str}.pkl')
     self.new_activities_path = os.path.join(os.getcwd(), f'new_activities_at_{time_str}.pkl')
     self.new_prompts_path = os.path.join(os.getcwd(), f'new_prompts_at_{time_str}.txt')
     self.experiments_data_path = os.path.join(os.getcwd(), f'experiments_data_{exp_name}_at_{time_str}.pkl')
-    self.new_triples_path = os.path.join(os.getcwd(), f'new_triples.pkl')
+    self.new_triples_path = os.path.join(os.getcwd(), f'new_triples_at_{time_str}.pkl')
     if self.from_saved_experiment or self.load_experiment_data:
-      exp_dir = '/home/bass/experiments/with both/2'
+      exp_dir = '/home/bass/experiments/with both/new_born_agent/2'
       # exp_dir = '/home/bass/experiments/effect_of_order'
       # exp_dir = '/home/bass'
-      experiment_file_names_list = glob.glob(os.path.join(exp_dir, f'experiments_data_{exp_name}_at_*.pkl'))
-      if len(experiment_file_names_list) == 0:
-            raise Exception('No saved experiments data found')
-      all_exp_dt_str = [file_name.split('_at_')[1].split('.')[0] for file_name in experiment_file_names_list]
-      all_exp_dt_str = list(filter(lambda x: dt.strptime(x, '%Y%m%d-%H%M%S'), all_exp_dt_str))
-      exp_file_name = 'experiments_data_{}_at_{}.pkl'.format(exp_name, max(all_exp_dt_str))
-      exp_file_name = os.path.join(exp_dir, exp_file_name)
+      exp_file_name = get_most_recent_filename(exp_dir, f'experiments_data_{exp_name}')
       with open(exp_file_name, 'rb') as f:
           self.saved_experiment_data = pickle.load(f)
-      # if self.use_experience:
-      #   print(exp_name)
-      #   print([[k, v] for k, all_v in self.saved_experiment_data.items() for k1, v in all_v.items() if '_prompt' in k1])
-      # exit()
+
     self.new_activities = {}
     self.new_info = []
+    self.all_run_new_info = ""
     if self.load_query_results:
+      print('Loading query results from: ', self.query_results_path.split('_at_')[0]+'.pkl')
       with open(self.query_results_path.split('_at_')[0]+'.pkl', 'rb') as f:
         self.query_results = pickle.load(f)
-    if self.load_activities:
-      with open(self.new_activities_path, 'rb') as f:
+    if self.load_activities or self.load_experiment_data:
+      if self.load_experiment_data:
+        act_file_name = get_most_recent_filename(exp_dir, 'new_activities')
+        try:
+          triple_file_name = get_most_recent_filename(exp_dir, 'new_triples')
+        except:
+          triple_file_name = None
+          print('WARNING::No triples file found')
+      else:
+        act_file_name = self.new_activities_path
+        triple_file_name = self.new_triples_path
+      with open(act_file_name, 'rb') as f:
         self.new_activities = pickle.load(f)
-      with open(self.new_triples_path, 'rb') as f:
-        new_triples = pickle.load(f)
-      self.prolog.all_solutions(new_triples)
+      print('Loaded new activities from: ', act_file_name)
+      print('Loaded new activities: ', list(self.new_activities.keys()))
+      if triple_file_name is not None:
+        with open(triple_file_name, 'rb') as f:
+          new_triples = pickle.load(f)
+        # print(new_triples)
+        res = self.prolog.all_solutions(new_triples)
+        if len(res) == 0:
+          raise Exception('New triples did not get added to the ontology!')
+        print('Loaded new triples from: ', triple_file_name)
+        # print('Loaded new triples: ', new_triples)
     rospy.Subscriber("/sign_command", String, self.sign_command_callback)
     self.sign_command = None
     self.experiments_data = {}
-    if self.load_experiment_data:
-      self.experiments_data = self.saved_experiment_data
     self.total_mistakes = 0
     self.reasoning_correction = 0
     self.reasoning_mistake_detection = 0
     self.human_intervention = 0
+    self.order = 0
+  
+  def brain_shutdown(self):
+    nodes = os.popen("rosnode list").readlines()
+    for i in range(len(nodes)):
+        nodes[i] = nodes[i].replace("\n","")
+
+    for node in nodes:
+      if node != "/rosout" and "butler_brain" not in node:
+        os.system("rosnode kill "+ node)
   
   def sign_command_callback(self, msg):
     self.sign_command = msg.data
@@ -210,14 +236,6 @@ class ButlerBrain():
             self.experiments_data[act_name]['reasoning_correction'].append(f"action_correction({func_name}, {correction})")
             new_gpt_string[i] = new_gpt_string[i].replace(func_name, correction)
             func_name = correction
-          # else:
-          #   comp_type = "LiquidTangibleThing" if func_name == "pour" else "SolidTangibleThing"
-          #   if not self.reasoning_subclass_of(input_args[0], comp_type):
-          #     predicted_cmd = (func_name, input_args[0])
-          #     if predicted_cmd not in [cmd[:2] for cmd in true_cmds]:
-          #       self.reasoning_mistake_detection += 1
-          #       self.experiments_data[act_name]['reasoning_mistake_detection'].append(f"action_correction({func_name}, {correction})")
-          #       print(f"mistake in reasoning for {func_name}({input_args[0]})")
           
 
       if len(input_args) == 2:
@@ -309,13 +327,11 @@ class ButlerBrain():
     self.experiments_data[act_name]['mistakes'] = mistakes
     self.experiments_data[act_name]['n_mistakes'] = n_mistakes
     self.experiments_data[act_name]['n_mistakes_until_now'] = self.total_mistakes
-    if 'order' not in self.experiments_data[act_name]:
-      self.experiments_data[act_name]['order'] = 0
-    else:
-      self.experiments_data[act_name]['order'] += 1
+    self.experiments_data[act_name]['order'] = self.order
     print("Reasoning correction = ", self.reasoning_correction)
     print("current_mistakes = ", n_mistakes)
     print("total mistakes = ", self.total_mistakes)
+    self.order += 1
   
   def add_new_activity(self, data_point, predict=False):
     self.new_info = []
@@ -439,17 +455,12 @@ class ButlerBrain():
             self.new_info.append(f"subclass_of({E},{self.ns}EatingVessel\")")
       self.new_info = [f"kb_project({i})" for i in self.new_info]
       query_string = ",".join(self.new_info)
+      self.all_run_new_info = ",".join([self.all_run_new_info,query_string]).strip(",")
       # print("query_string = ", query_string)
       self.prolog.all_solutions(query_string)
-      if self.save_activites:
-        with open(self.new_triples_path, 'wb') as f:
-          pickle.dump(query_string, f)
     # exit()
     # with open('/home/bass/triples/new_triples.json','a') as f:
     #   json.dump(a,f)
-    if self.save_activites:
-      with open(self.new_activities_path, 'wb') as f:
-        pickle.dump(self.new_activities, f)
     # self.perform_activity(self.new_activities[act_name])
   
   def perform_activity(self, chosen_activity):
@@ -483,7 +494,6 @@ class ButlerBrain():
     self.ra.prepare_food_or_drink(chosen_activity, container=container)
   
   def main(self):
-
     commands_list_drinks = ["Make me tomato juice please",
                      "I would love a coffee machiato please",
                      "Please prepare me a hot-chocolate",
@@ -576,24 +586,91 @@ class ButlerBrain():
                                     "boil some water with onions, carrots, and tomatoes, then put chicken in the bowl",
                                     "put the steak on the plate, the add some potatoes, and onions, with some barbecue sauce on the side"]
     
+    test_commands_list_foods = ["Please make me a chicken fajita",
+                                "Can I have a Caesar salad please?",
+                                "Make me a vegetable stir-fry with tofu please",
+                                "I would like a grilled cheese sandwich please",
+                                "Can you prepare a beef stroganoff for me?"]
 
-    if self.use_test_data:
-      test_drinks_data_list = list(zip(test_commands_list_drinks, test_output_components_list_drinks, test_output_name_list_drinks, test_steps_description_list_drinks, test_steps_list_drinks, test_rob_commands_list_drinks))
-      test_drinks_data_sorted = sorted(test_drinks_data_list, key=lambda x: len(x[3]), reverse=True)
-      test_drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in test_drinks_data_sorted]
-      test_data = test_drinks_data
-      data = sorted(test_data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
-    else:
-      drinks_data_list = list(zip(commands_list_drinks, output_components_list_drinks, output_name_list_drinks, steps_description_list_drinks, steps_list_drinks, rob_commands_list_drinks))
-      drinks_data_sorted = sorted(drinks_data_list, key=lambda x: len(x[3]), reverse=True)
-      drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in drinks_data_sorted]
-      foods_data_list = list(zip(commands_list_foods, output_components_list_foods, output_name_list_foods, steps_description_list_foods, steps_list_foods, rob_commands_list_foods))
-      foods_data_sorted = sorted(foods_data_list, key=lambda x: len(x[3]), reverse=True)
-      foods_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Food'} for x in foods_data_sorted]
-      data = drinks_data + foods_data
-      data = sorted(data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
+    test_output_components_list_foods = [['chicken', 'fajita'],
+        ['Caesar', 'salad'],
+        ['vegetable', 'stir-fry', 'tofu'],
+        ['grilled', 'cheese', 'sandwich'],
+        ['beef', 'stroganoff']]
+
+    test_output_name_list_foods = ['ChickenFajita',    'CaesarSalad',    'VegetableTofuStirFry',    'GrilledCheeseSandwich',    'BeefStroganoff']
+
+    test_steps_description_list_foods = ['Grill marinated chicken and peppers, wrap them in a tortilla, and serve with sour cream and salsa.',
+                                         'Mix romaine lettuce, croutons, parmesan cheese, and Caesar dressing in a bowl, then serve.',
+                                         'Stir-fry mixed vegetables and tofu in a wok with sesame oil and soy sauce, then serve over rice.',
+                                         'Butter two slices of bread, place cheese between the slices, and grill in a pan until the bread is toasted and the cheese is melted.',
+                                         'Cook beef strips in a pan with onion and garlic, add sour cream and beef broth, and serve over egg noodles.']
+
+    test_steps_list_foods = [['transport chicken to grill',
+                              'transport peppers to grill',
+                              'transport grilled food to tortilla',
+                              'transport tortilla to plate',
+                              'pour sour cream to plate',
+                              'pour salsa to plate',
+                              'container(plate)'],
+                             ['transport lettuce to bowl',
+                              'transport croutons to bowl',
+                              'transport parmesan cheese to bowl',
+                              'transport caesar dressing to bowl',
+                              'container(bowl)'],
+                             ['transport vegetables to wok',
+                              'transport tofu to wok',
+                              'pour sesame-oil to wok',
+                              'pour soy-sauce to wok',
+                              'transport rice to bowl'
+                              'transport wok to bowl',
+                              'container(bowl)'],
+                             ['transport butter to bread',
+                              'transport cheese to bread',
+                              'transport bread to pan',
+                              'transport grilled food to plate',
+                              'container(plate)'],
+                             ['transport beef strips to pan',
+                              'transport onion to pan',
+                              'transport garlic to pan',
+                              'transport egg noodles to bowl',
+                              'transport grilled food to bowl',
+                              'pour sour cream to bowl',
+                              'pour beef broth to bowl',
+                              'container(bowl)']]
+    test_rob_commands_list_foods = list(filter(lambda x:self.gpt_string_commands_to_list("\n".join(x), use_gpt_string=False), test_steps_list_foods))
     
-    for data_point in data:    
+
+    test_drinks_data_list = list(zip(test_commands_list_drinks, test_output_components_list_drinks, test_output_name_list_drinks, test_steps_description_list_drinks, test_steps_list_drinks, test_rob_commands_list_drinks))
+    test_drinks_data_sorted = sorted(test_drinks_data_list, key=lambda x: len(x[3]), reverse=True)
+    test_drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in test_drinks_data_sorted]
+    test_foods_data_list = list(zip(test_commands_list_foods, test_output_components_list_foods, test_output_name_list_foods, test_steps_description_list_foods, test_steps_list_foods, test_rob_commands_list_foods))
+    test_foods_data_sorted = sorted(test_foods_data_list, key=lambda x: len(x[3]), reverse=True)
+    test_foods_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Food'} for x in test_foods_data_sorted]
+    test_data = test_drinks_data + test_foods_data
+    sorted_test_data = sorted(test_data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
+      
+    drinks_data_list = list(zip(commands_list_drinks, output_components_list_drinks, output_name_list_drinks, steps_description_list_drinks, steps_list_drinks, rob_commands_list_drinks))
+    drinks_data_sorted = sorted(drinks_data_list, key=lambda x: len(x[3]), reverse=True)
+    drinks_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Drink'} for x in drinks_data_sorted]
+    foods_data_list = list(zip(commands_list_foods, output_components_list_foods, output_name_list_foods, steps_description_list_foods, steps_list_foods, rob_commands_list_foods))
+    foods_data_sorted = sorted(foods_data_list, key=lambda x: len(x[3]), reverse=True)
+    foods_data = [{'requests':x[0], 'components':x[1], 'output':x[2], 'steps_description':x[3], 'steps':x[4], 'rob_cmds':x[5], 'type':'Food'} for x in foods_data_sorted]
+    train_data = drinks_data + foods_data
+    sorted_train_data = sorted(train_data, key=lambda x: len(x['steps_description']), reverse=self.reversed)
+
+    all_foods_data = test_foods_data + foods_data
+    all_drinks_data = test_drinks_data + drinks_data
+    all_data = sorted_train_data + sorted_test_data
+    np.random.seed(23)
+    test_data = np.random.choice(all_foods_data, size=4, replace=False).tolist() + np.random.choice(all_drinks_data, size=4, replace=False).tolist()
+    train_data = [x for x in all_data if x not in test_data]
+    np.random.shuffle(train_data)
+    if self.use_test_data:
+      data = test_data
+    else:
+      data = train_data
+    for dp_i, data_point in enumerate(data):    
       # input("Press Enter to continue...")
       if not self.from_saved_experiment:
         rospy.sleep(31)
@@ -630,9 +707,15 @@ class ButlerBrain():
         print("total mistakes = ", self.total_mistakes)
       else:
         self.add_new_activity(data_point=data_point)
-      if self.save_experiments_data:
-        with open(self.experiments_data_path, 'wb') as f:
-          pickle.dump(self.experiments_data, f)
+      if dp_i == len(data)-1:
+        if self.save_experiments_data:
+          with open(self.experiments_data_path, 'wb') as f:
+            pickle.dump(self.experiments_data, f)
+        if self.save_activites:
+          with open(self.new_triples_path, 'wb') as f:
+            pickle.dump(self.all_run_new_info, f)
+          with open(self.new_activities_path, 'wb') as f:
+            pickle.dump(self.new_activities, f)
       continue
       comp_enc = self.model.encode([component.lower() for component in output_components], device='cuda')
       
@@ -911,5 +994,7 @@ class ButlerBrain():
       # self.perform_activity(chosen_activity)
 
 if __name__ == "__main__":
+  
   butler_brain = ButlerBrain()
+  rospy.sleep(4)
   butler_brain.main()

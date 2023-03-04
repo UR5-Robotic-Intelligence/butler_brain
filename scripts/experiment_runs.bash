@@ -1,96 +1,96 @@
 #!/bin/bash
 
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -e "from_description_and_request" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ur -e "from_description_and_request" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ut -e "from_description_and_request" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ut -ur -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ur -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ut -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ut -ur -e "from_description_and_request" -v
+roslaunch butler_brain butler_brain.launch e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ur:='-ur' e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ut:='-ut' e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ur:='-ur' e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' e:='-e "from_description_and_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
 
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -e "from_request" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ur -e "from_request" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ut -e "from_request" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ut -ur -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ur -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ut -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ut -ur -e "from_request" -v
+roslaunch butler_brain butler_brain.launch e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ur:='-ur' e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ut:='-ut' e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ut:='-ut' ur:='-ur' e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ur:='-ur' e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' e:='-e "from_request"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_request"'
 
 
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -e "from_description" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ur -e "from_description" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ut -e "from_description" -v
-# #rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ut -ur -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ur -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ut -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py  -l -lq -ld -sa -se -ue -ut -ur -e "from_description" -v
+roslaunch butler_brain butler_brain.launch e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ur:='-ur' e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ut:='-ut' e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ut:='-ut' ur:='-ur' e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ur:='-ur' e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' e:='-e "from_description"'
+roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description"'
 
-# rosrun owl_test uji_butler_dev.py -l -lq -ld -sa -se -ue -ut -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -l -lq -ld -sa -se -ue -ut -r -e "from_description" -v
+# roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch ue:='-ue' ut:='-ut' -r e:='-e "from_description"'
 
 # FROM SAVED EXPERIENCE
 
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ur -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ut -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ut -ur -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ur -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -e "from_description_and_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -ur -e "from_description_and_request" -v
+# roslaunch butler_brain butler_brain.launch fse:='-fse' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ur:='-ur' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ut:='-ut' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ur:='-ur' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
 
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ur -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ut -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ut -ur -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ur -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -e "from_request" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -ur -e "from_request" -v
+# roslaunch butler_brain butler_brain.launch fse:='-fse' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ur:='-ur' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ut:='-ut' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ut:='-ut' ur:='-ur' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ur:='-ur' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_request"'
 
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ur -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ut -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ut -ur -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ur -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -ur -e "from_description" -v
+# roslaunch butler_brain butler_brain.launch fse:='-fse' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ut:='-ut' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ut:='-ut' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description"'
 
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -ur -e "from_description" -v
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -ur -r -e "from_description" -v
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' ur:='-ur' -r e:='-e "from_description"'
 
-# rosrun owl_test uji_butler_dev.py -fse -l -lq -ld -sa -se -ue -ut -ur -e "from_description_and_request" -v
+# roslaunch butler_brain butler_brain.launch fse:='-fse' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
 
 
 # Use Test Data, Load Prev Data
 
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ur -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ut -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ut -ur -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ur -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ut -e "from_description_and_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ut -ur -e "from_description_and_request" -v
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ur:='-ur' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ut:='-ut' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ur:='-ur' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ut:='-ut' e:='-e "from_description_and_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description_and_request"'
 
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ur -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ut -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ut -ur -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ur -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ut -e "from_request" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ut -ur -e "from_request" -v
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ur:='-ur' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ut:='-ut' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ut:='-ut' ur:='-ur' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ur:='-ur' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ut:='-ut' e:='-e "from_request"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_request"'
 
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ur -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ut -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ut -ur -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ur -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ut -e "from_description" -v
-rosrun owl_test uji_butler_dev.py -le -utd -l -lq -ld -sa -se -ue -ut -ur -e "from_description" -v
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ut:='-ut' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ut:='-ut' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ur:='-ur' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ut:='-ut' e:='-e "from_description"'
+# roslaunch butler_brain butler_brain.launch le:='-le' utd:='-utd' ue:='-ue' ut:='-ut' ur:='-ur' e:='-e "from_description"'
