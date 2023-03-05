@@ -208,12 +208,20 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   fig_titles.extend(new_fig_titles)
   
   color = ['blue', 'red', 'green', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
-  title = f'{compare_by} vs No {compare_by}' #if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
-  x_label = f'Additional Information (All have activity {input_type})' if input_type != '' else 'Additional Information'
+  c = 'Learning' if compare_by == 'experience' else compare_by
+  title = f'{c} vs No {c}' #if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
+  if not use_activities:
+    x_label = f'Additional Information (All have activity {input_type})' if input_type != '' else 'Additional Information'
+  else:
+    x_label = f'Activity (All have activity {input_type})' if input_type != '' else 'Activity'
   x_label += f' (sorted by {sort_by})' if sort_keys else ''
   x_ticks = []
   if input_type != '':
     x_ticks = [name.replace(f'from_{input_type}_use_','').replace('use','and').replace(f'from_{input_type}','nothing') for name in all_exps[1].keys()]
+  elif use_activities:
+    for name in all_exps[0].keys():
+      name = name.replace('Making-', '')
+      x_ticks.append(name)
   else:
     p4 = 'from_description'
     p6 = 'from_request'
@@ -335,22 +343,29 @@ if __name__ == '__main__':
   # data_names.append('Experienced')
   # data_dir.append('/home/bass/experiments/on_test_set/new_born_agent/2')
   # data_names.append('New Born')
-  data_dir.append('/home/bass/experiments/with both/new_born_agent/4')
-  data_names.append('New Born (on train set)')
+  # data_dir.append('/home/bass/experiments/with both/new_born_agent/4')
+  # data_names.append('New Born')
+  data_dir.append('/home/bass/experiments/on_test_set/new_born_agent/2')
+  data_names.append('New Born')
+  data_dir.append('/home/bass/experiments/on_test_set/experienced_agent/2')
+  data_names.append('Experienced')
   input_type = ''
   # input_type = 'request'
   # input_type = 'description'
   # input_type = 'description_and_request'
   # score_type = ['n_mistakes', 'fuzzy_score']
-  # score_type = 'fuzzy_score'
-  score_type = 'n_mistakes'
+  score_type = 'fuzzy_score'
+  # score_type = 'n_mistakes'
   compare_by = ''
-  # compare_by = 'experience'
-  compare_by = 'reasoning'
+  compare_by = 'experience'
+  # compare_by = 'reasoning'
   must_have = ['']
-  # must_have.append('reasoning')
+  must_have.append('reasoning')
+  # must_have.append('experience')
   none_of = []
   # none_of.append('experience')
+  # none_of.append('reasoning')
+  none_of.append('from_request')
   analyze_experiments(data_dir=data_dir, data_names=data_names, input_type=input_type, score_type=score_type,
-                      use_activities=False, compare_by=compare_by, must_have=must_have, none_of=none_of,
+                      use_activities=True, compare_by=compare_by, must_have=must_have, none_of=none_of,
                       plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=None)

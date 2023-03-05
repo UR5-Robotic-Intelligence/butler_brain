@@ -508,7 +508,7 @@ def gpt(text, prompt_to_use='text_to_keywords', new_prompt="", verbose=False):
     n=1,
     stream=False,
     logprobs=None,
-    stop=["Q:"]
+    stop=["Q:"],
   )
   if verbose:
     print("The used gpt prompt is:")
