@@ -331,10 +331,12 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
 if __name__ == '__main__':
   data_dir = []
   data_names = []
-  data_dir.append('/home/bass/experiments/on_test_set/experienced_agent/1')
-  data_names.append('Experienced')
-  data_dir.append('/home/bass/experiments/on_test_set/new_born_agent/2')
-  data_names.append('New Born')
+  # data_dir.append('/home/bass/experiments/on_test_set/experienced_agent/1')
+  # data_names.append('Experienced')
+  # data_dir.append('/home/bass/experiments/on_test_set/new_born_agent/2')
+  # data_names.append('New Born')
+  data_dir.append('/home/bass/experiments/with both/new_born_agent/4')
+  data_names.append('New Born (on train set)')
   input_type = ''
   # input_type = 'request'
   # input_type = 'description'
@@ -351,4 +353,4 @@ if __name__ == '__main__':
   # none_of.append('experience')
   analyze_experiments(data_dir=data_dir, data_names=data_names, input_type=input_type, score_type=score_type,
                       use_activities=False, compare_by=compare_by, must_have=must_have, none_of=none_of,
-                      plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=5)
+                      plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=None)

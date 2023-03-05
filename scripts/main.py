@@ -58,6 +58,7 @@ class ButlerBrain():
     args.add_argument('-r', '--reversed', action='store_true', help='Use the reversed experiment data to generate the robot commands')
     args.add_argument('-le', '--load_experiment_data', action='store_true', help='Load the experiment data from a file')
     args.add_argument('-utd', '--use_test_data', action='store_true', help='Use the test data to generate the robot commands')
+    args.add_argument('-drr', '--dont_redo_reasoning', action='store_true', help='Do Not Redo the reasoning')
     parsed_args = args.parse_args()
     self.verbose = parsed_args.verbose
     self.load_embeddings = parsed_args.load_embeddings
@@ -77,6 +78,7 @@ class ButlerBrain():
     self.reversed = parsed_args.reversed
     self.load_experiment_data = parsed_args.load_experiment_data
     self.use_test_data = parsed_args.use_test_data
+    self.dont_redo_reasoning = parsed_args.dont_redo_reasoning
     
     # self.ra = RobotActivities(load_data=load_manip_data, save_data=save_manip_data, verbose=self.verbose)
 
@@ -85,20 +87,28 @@ class ButlerBrain():
     self.ns = ou.ns
     self.model = SentenceTransformer('bert-base-nli-mean-tokens')
     time_str = dt.now().strftime("%Y%m%d-%H%M%S")
-    exp_name = self.exp
-    exp_name += '_use_experience' if self.use_experience else ''
-    exp_name += '_use_type' if self.use_type else ''
-    exp_name += '_use_reasoning' if self.use_reasoning else ''
+    save_exp_name = self.exp
+    save_exp_name += '_use_experience' if self.use_experience else ''
+    save_exp_name += '_use_type' if self.use_type else ''
+    exp_name = save_exp_name
+    if self.from_saved_experiment:
+      if self.dont_redo_reasoning:
+        exp_name += '_use_reasoning' if self.use_reasoning else ''
+    else:
+        exp_name += '_use_reasoning' if self.use_reasoning else ''
+    save_exp_name += '_use_reasoning' if self.use_reasoning else ''
+    save_exp_name += '_reversed' if self.reversed else ''
     exp_name += '_reversed' if self.reversed else ''
     os.chdir(os.environ['HOME'])
     self.data_path = os.path.join(os.getcwd(), f'uji_butler_wokring_memory_at_{time_str}.txt')
     self.query_results_path = os.path.join(os.getcwd(), f'query_results_at_{time_str}.pkl')
     self.new_activities_path = os.path.join(os.getcwd(), f'new_activities_at_{time_str}.pkl')
     self.new_prompts_path = os.path.join(os.getcwd(), f'new_prompts_at_{time_str}.txt')
-    self.experiments_data_path = os.path.join(os.getcwd(), f'experiments_data_{exp_name}_at_{time_str}.pkl')
+    self.experiments_data_path = os.path.join(os.getcwd(), f'experiments_data_{save_exp_name}_at_{time_str}.pkl')
     self.new_triples_path = os.path.join(os.getcwd(), f'new_triples_at_{time_str}.pkl')
     if self.from_saved_experiment or self.load_experiment_data:
-      exp_dir = '/home/bass/experiments/with both/new_born_agent/2'
+      # exp_dir = '/home/bass/experiments/with both/new_born_agent/2'
+      exp_dir = '/home/bass/experiments/with both/new_born_agent/3'
       # exp_dir = '/home/bass/experiments/effect_of_order'
       # exp_dir = '/home/bass'
       exp_file_name = get_most_recent_filename(exp_dir, f'experiments_data_{exp_name}')
@@ -716,6 +726,7 @@ class ButlerBrain():
             pickle.dump(self.all_run_new_info, f)
           with open(self.new_activities_path, 'wb') as f:
             pickle.dump(self.new_activities, f)
+        rospy.sleep(5)
       continue
       comp_enc = self.model.encode([component.lower() for component in output_components], device='cuda')
       
