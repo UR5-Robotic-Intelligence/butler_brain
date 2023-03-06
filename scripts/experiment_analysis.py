@@ -46,7 +46,7 @@ figure_titles = ['(experience and type)',
                  '(type)',
                  'No Additional Information']
 
-def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys=False, sort_by='fuzzy_score',last_n_act=None):
+def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys=False, sort_by='fuzzy_score',last_n_act=None, test=False):
   experiments_data = {}
   avg_scores = {}
   for i, core_experiment_name in enumerate(experiment_names):
@@ -69,6 +69,9 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys
               if e_i < len(exp_cp) - last_n_act:
                 del experiment[k]
                 continue
+            if test:
+              if 'test' not in k:
+                del experiment[k]
             if 'n_mistakes' not in v:
                 v['n_mistakes'] = 0
             v['n_mistakes'] /= len(v['rob_commands'])
@@ -125,7 +128,7 @@ def dict_to_excel(experiment, experiment_name):
 def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with both/new_born_agent/2'], data_names=['new_born_agent'],
                         must_have=[''], none_of=[], input_type='', use_activities=False, last_n_act=None,
                         score_type='n_mistakes', compare_by='reasoning',
-                        plot=True, sort_keys=False, sort_by=None):
+                        plot=True, sort_keys=False, sort_by=None, test=False):
   
   if input_type == 'description':
     none_of += ['request']
@@ -141,7 +144,7 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   if type(data_names) == str:
     data_names = [data_names]
   for name, ddir in zip(data_names, data_dir):
-    experiments_data = get_experiment_data(sort_by=sort_by, sort_keys=sort_keys, data_dir=ddir, last_n_act=last_n_act)
+    experiments_data = get_experiment_data(sort_by=sort_by, sort_keys=sort_keys, data_dir=ddir, last_n_act=last_n_act, test=test)
     experiments = filter_experiments(experiments_data, all_of=[f'from_{input_type}', compare_by]+must_have, none_of=none_of)
     all_exps.append(experiments)
     all_exps_names.append(name)
@@ -345,10 +348,12 @@ if __name__ == '__main__':
   # data_names.append('New Born')
   # data_dir.append('/home/bass/experiments/with both/new_born_agent/4')
   # data_names.append('New Born')
-  data_dir.append('/home/bass/experiments/on_test_set/new_born_agent/2')
-  data_names.append('New Born')
-  data_dir.append('/home/bass/experiments/on_test_set/experienced_agent/2')
-  data_names.append('Experienced')
+  # data_dir.append('/home/bass/experiments/on_test_set/new_born_agent/2')
+  # data_names.append('New Born')
+  # data_dir.append('/home/bass/experiments/on_test_set/experienced_agent/2')
+  # data_names.append('Experienced')
+  data_dir.append('/home/bass/experiments/continuous_testing/new_born_agent/1')
+  data_names.append('New Born Continuous Testing')
   input_type = ''
   # input_type = 'request'
   # input_type = 'description'
@@ -360,12 +365,12 @@ if __name__ == '__main__':
   compare_by = 'experience'
   # compare_by = 'reasoning'
   must_have = ['']
-  must_have.append('reasoning')
+  # must_have.append('reasoning')
   # must_have.append('experience')
   none_of = []
   # none_of.append('experience')
   # none_of.append('reasoning')
   none_of.append('from_request')
   analyze_experiments(data_dir=data_dir, data_names=data_names, input_type=input_type, score_type=score_type,
-                      use_activities=True, compare_by=compare_by, must_have=must_have, none_of=none_of,
-                      plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=None)
+                      use_activities=False, compare_by=compare_by, must_have=must_have, none_of=none_of,
+                      plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=None, test=True)

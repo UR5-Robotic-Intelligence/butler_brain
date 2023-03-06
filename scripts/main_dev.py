@@ -35,32 +35,7 @@ def get_most_recent_filename(exp_dir=os.getcwd(),prefix='experiments_data_exp_na
 
 
 class ButlerBrain():
-  def __init__(self) -> None:
-    rospy.init_node('butler_brain',argv=sys.argv)
-    sys.argv = rospy.myargv(argv=sys.argv)
-    rospy.on_shutdown(self.brain_shutdown)
-    args = argparse.ArgumentParser(description='Test the rosprolog service')
-    args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
-    args.add_argument('-s', '--save_embeddings', action='store_true', help='Save the query embeddings to a file')
-    args.add_argument('-l', '--load_embeddings', action='store_true', help='Load the query embeddings from a file')
-    args.add_argument('-lq', '--load_query_results', action='store_true', help='Load the query results from a file')
-    args.add_argument('-sq', '--save_query_results', action='store_true', help='Save the query results to a file')
-    args.add_argument('-la', '--load_activities', action='store_true', help='load the new activities from a file')
-    args.add_argument('-sa', '--save_activites', action='store_true', help='Save the new_activities to a file')
-    args.add_argument('-ld', '--load_manip_data', action='store_true', help='load the manip data from a file')
-    args.add_argument('-sd', '--save_manip_data', action='store_true', help='Save the manip data to a file')
-    args.add_argument('-se', '--save_experiments_data', action='store_true', help='Save the experiments data to a file')
-    args.add_argument('-e', '--exp', type=str, help='The experiments are (from_description, from_request, from_description_and_request)')
-    args.add_argument('-ue', '--use_experience', action='store_true', help='Use the experience to generate the robot commands')
-    args.add_argument('-ut', '--use_type', action='store_true', help='Use the type (meal/drink) to generate the robot commands')
-    args.add_argument('-ur', '--use_reasoning', action='store_true', help='Use the reasoning to generate the robot commands')
-    args.add_argument('-fse', '--from_saved_experiment', action='store_true', help='Use the saved experiment data to generate the robot commands')
-    args.add_argument('-r', '--reversed', action='store_true', help='Use the reversed experiment data to generate the robot commands')
-    args.add_argument('-le', '--load_experiment_data', action='store_true', help='Load the experiment data from a file')
-    args.add_argument('-utd', '--use_test_data', action='store_true', help='Use the test data to generate the robot commands')
-    args.add_argument('-drr', '--dont_redo_reasoning', action='store_true', help='Do Not Redo the reasoning')
-    args.add_argument('-upe', '--use_previous_exp', action='store_true', help='Use the previous experiment data to generate the robot commands')
-    parsed_args = args.parse_args()
+  def __init__(self, parsed_args) -> None:
     self.verbose = parsed_args.verbose
     self.load_embeddings = parsed_args.load_embeddings
     self.save_embeddings = parsed_args.save_embeddings
@@ -163,15 +138,6 @@ class ButlerBrain():
     self.reasoning_mistake_detection = 0
     self.human_intervention = 0
     self.order = 0
-  
-  def brain_shutdown(self):
-    nodes = os.popen("rosnode list").readlines()
-    for i in range(len(nodes)):
-        nodes[i] = nodes[i].replace("\n","")
-
-    for node in nodes:
-      if node != "/rosout" and "butler_brain" not in node:
-        os.system("rosnode kill "+ node)
   
   def sign_command_callback(self, msg):
     self.sign_command = msg.data
@@ -355,11 +321,13 @@ class ButlerBrain():
     print("total mistakes = ", self.total_mistakes)
     self.order += 1
   
-  def add_new_activity(self, data_point, predict=False):
+  def add_new_activity(self, data_point, predict=False, idx=None):
     self.new_info = []
     self.reasoning_correction = 0
     output_name = data_point['output']
     act_name = "Making-"+output_name
+    idx = self.order if idx is None else idx
+    act_name += f'_test_{idx}' if predict else ''
     print("output = ",act_name)
     type_txt = data_point['type']
     self.experiments_data[act_name] = {}
@@ -382,7 +350,7 @@ class ButlerBrain():
     if self.use_type:
       gpt_prompt = f'{gpt_prompt}_{type_txt.lower()}'
     print("additional_prompts: ", additional_prompts)
-    if not self.from_saved_experiment:
+    if not self.from_saved_experiment or (predict and not (self.use_reasoning and self.from_saved_experiment)):
       res, act_to_cmds_prompt = gpt(gpt_question, prompt_to_use=gpt_prompt,new_prompt=additional_prompts, verbose=self.verbose)
     else:
       res = self.saved_experiment_data[act_name][f'{gpt_prompt}_res']
@@ -415,6 +383,9 @@ class ButlerBrain():
     
     # compare the predicted commands with the labeled commands
     self.compare_commands(rob_commands, label_rob_commands, container, act_name, res)
+    
+    if predict:
+      return rob_commands
     
     # add the new activity to the ontology
     new_rob_commands = label_rob_commands 
@@ -739,6 +710,17 @@ class ButlerBrain():
           new_act = self.add_new_activity(data_point=data_point)
           if new_act is None:
             rospy.sleep(31)
+            continue
+          print(f"TESTING PHASE {dp_i}==================")
+          for dp in test_data:
+            print(f"TESTING DATA POINT WITH OUTPUT {dp['output']}")
+            rospy.sleep(31)
+            new_act = None
+            while new_act is None and (not rospy.is_shutdown()):
+              new_act = self.add_new_activity(data_point=dp, predict=True, idx=dp_i)
+              if new_act is None:
+                rospy.sleep(31)
+                continue
         
       if dp_i == len(data)-1:
         if self.save_experiments_data:
@@ -1027,8 +1009,41 @@ class ButlerBrain():
       # Perform the activities
       # self.perform_activity(chosen_activity)
 
+def brain_shutdown():
+  nodes = os.popen("rosnode list").readlines()
+  for i in range(len(nodes)):
+      nodes[i] = nodes[i].replace("\n","")
+
+  for node in nodes:
+    if node != "/rosout" and "butler_brain" not in node:
+      os.system("rosnode kill "+ node)
+
 if __name__ == "__main__":
-  
-  butler_brain = ButlerBrain()
+  rospy.init_node('butler_brain',argv=sys.argv)
+  sys.argv = rospy.myargv(argv=sys.argv)
+  rospy.on_shutdown(brain_shutdown)
+  args = argparse.ArgumentParser(description='Test the rosprolog service')
+  args.add_argument('-v', '--verbose', action='store_true', help='Print the explanations and intermediate results')
+  args.add_argument('-s', '--save_embeddings', action='store_true', help='Save the query embeddings to a file')
+  args.add_argument('-l', '--load_embeddings', action='store_true', help='Load the query embeddings from a file')
+  args.add_argument('-lq', '--load_query_results', action='store_true', help='Load the query results from a file')
+  args.add_argument('-sq', '--save_query_results', action='store_true', help='Save the query results to a file')
+  args.add_argument('-la', '--load_activities', action='store_true', help='load the new activities from a file')
+  args.add_argument('-sa', '--save_activites', action='store_true', help='Save the new_activities to a file')
+  args.add_argument('-ld', '--load_manip_data', action='store_true', help='load the manip data from a file')
+  args.add_argument('-sd', '--save_manip_data', action='store_true', help='Save the manip data to a file')
+  args.add_argument('-se', '--save_experiments_data', action='store_true', help='Save the experiments data to a file')
+  args.add_argument('-e', '--exp', type=str, help='The experiments are (from_description, from_request, from_description_and_request)')
+  args.add_argument('-ue', '--use_experience', action='store_true', help='Use the experience to generate the robot commands')
+  args.add_argument('-ut', '--use_type', action='store_true', help='Use the type (meal/drink) to generate the robot commands')
+  args.add_argument('-ur', '--use_reasoning', action='store_true', help='Use the reasoning to generate the robot commands')
+  args.add_argument('-fse', '--from_saved_experiment', action='store_true', help='Use the saved experiment data to generate the robot commands')
+  args.add_argument('-r', '--reversed', action='store_true', help='Use the reversed experiment data to generate the robot commands')
+  args.add_argument('-le', '--load_experiment_data', action='store_true', help='Load the experiment data from a file')
+  args.add_argument('-utd', '--use_test_data', action='store_true', help='Use the test data to generate the robot commands')
+  args.add_argument('-drr', '--dont_redo_reasoning', action='store_true', help='Do Not Redo the reasoning')
+  args.add_argument('-upe', '--use_previous_exp', action='store_true', help='Use the previous experiment data to generate the robot commands')
+  parsed_args = args.parse_args()
+  butler_brain = ButlerBrain(parsed_args)
   rospy.sleep(4)
   butler_brain.main()
