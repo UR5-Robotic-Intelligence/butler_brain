@@ -87,7 +87,8 @@ class ButlerBrain():
       # exp_dir = '/home/bass/experiments/with both/new_born_agent/2'
       # exp_dir = '/home/bass/experiments/with both/new_born_agent/4'
       # exp_dir = '/home/bass/experiments/on_test_set/experienced_agent/2'
-      exp_dir = '/home/bass/experiments/on_test_set/new_born_agent/2'
+      # exp_dir = '/home/bass/experiments/on_test_set/new_born_agent/2'
+      exp_dir = '/home/bass/experiments/continuous_testing/new_born_agent/2'
       # exp_dir = '/home/bass/experiments/effect_of_order'
       # exp_dir = '/home/bass'
       exp_file_name = get_most_recent_filename(exp_dir, f'experiments_data_{exp_name}')
@@ -708,17 +709,18 @@ class ButlerBrain():
         new_act = None
         while new_act is None and (not rospy.is_shutdown()):
           new_act = self.add_new_activity(data_point=data_point)
-          if new_act is None:
+          if new_act is None and not self.from_saved_experiment:
             rospy.sleep(31)
             continue
           print(f"TESTING PHASE {dp_i}==================")
           for dp in test_data:
             print(f"TESTING DATA POINT WITH OUTPUT {dp['output']}")
-            rospy.sleep(31)
+            if not self.from_saved_experiment:
+              rospy.sleep(31)
             new_act = None
             while new_act is None and (not rospy.is_shutdown()):
               new_act = self.add_new_activity(data_point=dp, predict=True, idx=dp_i)
-              if new_act is None:
+              if new_act is None and not self.from_saved_experiment:
                 rospy.sleep(31)
                 continue
         
