@@ -177,7 +177,7 @@ class ButlerBrain():
     gpt_string = gpt_string.strip().strip().split("\n")
     # print("gpt_string: ", gpt_string)    
     try:
-      container = gpt_string[-1].split("(")[1].split(")")[0]
+      container = gpt_string[-1].split("container(")[1].split(")")[0]
     except Exception as e:
       raise Exception("SYNTAX ERROR IN GPT STRING WITH ERROR: ", e, "gpt_string: ", gpt_string)
       # container = "unknown"

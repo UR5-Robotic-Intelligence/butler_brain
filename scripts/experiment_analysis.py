@@ -96,17 +96,6 @@ def get_experiment_data(data_dir="/home/bass/experiments/with both/2", sort_keys
             avg_scores[new_experiment_name]['n_mistakes'] += v['n_mistakes']
             avg_scores[new_experiment_name]['bert_score'] += v['bert_score'][-1]
             avg_scores[new_experiment_name]['prompt_length'] += sum([len(v1) for k1, v1 in v.items() if k1.endswith('prompt')]) / len(v['rob_commands'])
-            if 'from_request' in new_experiment_name:
-              for k1, v1 in v.items():
-                if k1.endswith('prompt'):
-                  print(f'{new_experiment_name}, {k}: {k1}: {v1}')
-                if k1.endswith('res'):
-                  print(f'{new_experiment_name}, {k}: {k1}: {v1}')
-              print(v['reasoning_correction'])
-              print(v['steps'])
-              print(v['n_mistakes'])
-              print(v['fuzzy_score'])
-              print('------------------')
             n += 1
         for e_i, e_name in enumerate(avg_scores.keys()):
           for k, v in avg_scores[e_name].items():
@@ -163,7 +152,7 @@ def get_fig_title_from_exp_name(exp_name, not_added):
 def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with both/new_born_agent/2'], data_names=['new_born_agent'],
                         must_have=[''], none_of=[], input_type='', use_activities=False, last_n_act=None,
                         score_type='n_mistakes', compare_by='reasoning',
-                        plot=True, sort_keys=False, sort_by=None, test=False, use_regions=False):
+                        plot=True, sort_keys=False, sort_by=None, test=False, use_regions=False, ax=None, l=0, bottom={}):
   
   if input_type == 'description':
     none_of += ['request']
@@ -202,31 +191,27 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   
   # experiment_1 vs experiment_2 in terms of score
   experiment_scores_dict = {}
+  experiment_human_intervention = []
   experiment_names = []
   if type(score_type) not in [list, tuple]:
     score_type = [score_type]
-  n = 1
   for i, exps in enumerate(all_exps):
     experiment_names.append([])
-    prev_scores = []
+    experiment_human_intervention.append([])
     for experiment_name, experiment in exps.items():
-      if '0' in experiment_name:
-        prev_scores = []
       # scores_dict = {score_type_:v[score_type_] for v in experiment.values() for score_type_ in score_type}
       for score_type_ in score_type:
-        scores = [v[score_type_] for v in experiment.values() if score_type_ in v]
+        if score_type_ == 'human_intervention':
+          scores = [len(v[score_type_]) for v in experiment.values() if score_type_ in v]
+        else:
+          scores = [v[score_type_] for v in experiment.values() if score_type_ in v]
         if len(scores) > 0:
           if score_type_ == 'n_mistakes':
             print(f"sum_{score_type_} = ", sum(scores))
           else:
             print(f"mean_{score_type_} = ", np.mean(scores))
-        # scores = sum(scores) if score_type_ == 'n_mistakes' else np.mean(scores)
-        new_scores = np.mean(scores)
-        scores = new_scores
-        if len(prev_scores) >= n-1:
-          all_scores = prev_scores+[scores]
-          scores = np.mean(all_scores[-n:])
-        prev_scores.append(new_scores)
+        scores = sum(scores) if score_type_ == 'human_intervention' else np.mean(scores)
+        # scores = np.mean(scores)
         if score_type_ not in experiment_scores_dict:
           experiment_scores_dict[score_type_] = {j:[] for j in range(len(all_exps))}
         experiment_scores_dict[score_type_][i].append(scores)
@@ -235,6 +220,7 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   if not plot:
     return experiment_names, experiment_scores_dict
 
+  plot_data = {}
   fs = 20
   tfs = 15
   # rotation = 0 if input_type != '' else 90
@@ -243,6 +229,8 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   if compare_by != '':
     if compare_by == 'experience':
       comp_by_title = ['Augmented Prompt', 'Fixed Prompt']
+      if 'reasoning' in must_have:
+        comp_by_title = ['Augmented Prompt & Reasoning', 'Fixed Prompt & Reasoning']
     else:
       c = compare_by.capitalize()
       comp_by_title = [f'With {c}', f'No {c}']
@@ -257,14 +245,20 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
         new_fig_titles.append(f'{ft} ({score_type_})')
   fig_titles.extend(new_fig_titles)
   
-  color = ['blue', 'red', 'green', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+  color = ['blue', 'red', 'green', 'brown', 'yellow', 'pink', 'gray', 'olive', 'cyan']
   if compare_by == 'experience':
     title = 'Pompt Augmentation Vs Fixed Prompt'
-    if 'reasoning' in must_have:
-      title += '\n(Both have Fact Correction & Knowledge Gain)'
   else:
     c = compare_by.capitalize()
     title = f'{c} vs No {c}' #if len(all_exps) == 2 else 'Effect of Additional Information (All have reasoning)'
+  if 'reasoning' in must_have:
+    title += '\n(Both have Fact Correction & Knowledge Gain)'
+  elif  'reasoning' in none_of:
+    title += '\n(No Fact Correction Nor Knowledge Gain in either)'
+  if 'experience' in must_have:
+    title += '\n(Both Augment their Prompt with more Experience)'
+  elif  'experience' in none_of:
+    title += '\n(Both use the same fixed initial Prompt)'
   if test:
     x_label = 'Test Index (A test after each new activity)'
   elif not use_activities:
@@ -282,7 +276,7 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   elif use_regions:
     if test:
       for name in all_exps[0].keys():
-        x_ticks.append(name.split('_')[-1])
+        x_ticks.append(int(name.split('_')[-1])+1)
   else:
     p4 = 'from_description'
     p6 = 'from_request'
@@ -308,8 +302,10 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
   name += f'_have_{must_have}' if must_have != [''] else ''
   name += f'_without_{none_of}' if none_of != [] else ''
   name += '.png'
-  ax = plt.gca()
-  ax.set_xlabel(f'{x_label}', fontsize=fs, fontweight='bold')
+  ax_was_none = False if ax is not None else True
+  if ax is None:
+    ax = [plt.gca()]
+    ax[0].set_xlabel(f'{x_label}', fontsize=fs, fontweight='bold')
   if test:
     n_test = max(list(map(lambda x: int(x.split('_')[-1]), experiment_names[0]))) + 1
     exp_prefix = list(dict.fromkeys(map(lambda x: '_'.join(x.split('_')[:-1]), experiment_names[0])))
@@ -319,106 +315,118 @@ def analyze_experiments(bar_plot=True, data_dir=['/home/bass/experiments/with bo
       regions = 'test_input_types'
     else:
       regions = 'input_types'
-    alpha = 0.3
-    if regions == 'test_input_types':
+    alpha = 0.4
+    col = ['orange', 'cyan', 'magenta']
+    if regions == 'test_input_types' and ax_was_none:
       for exp_i, exp_name in enumerate(exp_prefix):
+        if 'type' in exp_name:
+          alpha *= 0.5 
+        c = exp_i - len(exp_prefix)//2 if exp_i >= len(exp_prefix)//2 else exp_i
         label = get_fig_title_from_exp_name(exp_name,[compare_by]+must_have+none_of)
         x1 = exp_i*n_test
+        # x1 = exp_i*n_test + exp_i
         x2 = x1 + n_test - 1
-        ax.axvspan(x1, x2, color=color[exp_i], alpha=alpha, label=label) 
+        ax[0].axvspan(x1, x2, color=col[c], alpha=alpha, label=label) 
     elif regions == 'input_types':
-      ax.axvspan(0, 4, color='red', alpha=alpha, label='Description & Request')
-      ax.axvspan(4, 8, color='blue', alpha=alpha, label='Description')
-      ax.axvspan(8, 12, color='green', alpha=alpha, label='Request')
+      ax[0].axvspan(0, 4, color='red', alpha=alpha, label='Description & Request')
+      ax[0].axvspan(4, 8, color='blue', alpha=alpha, label='Description')
+      ax[0].axvspan(8, 12, color='green', alpha=alpha, label='Request')
     elif regions == 'additional_info_types':
-      ax.axvspan(-0.5, 2.5, color='red', alpha=alpha, label='Experience')
-      ax.axvspan(2.5, 5.5, color='blue', alpha=alpha, label='Experience & Type')
-      ax.axvspan(5.5, 8.5, color='green', alpha=alpha, label='No Additional Info')
-      ax.axvspan(8.5, 11.5, color='orange', alpha=alpha, label='Type')
-  l = 0
+      ax[0].axvspan(-0.5, 2.5, color='red', alpha=alpha, label='Experience')
+      ax[0].axvspan(2.5, 5.5, color='blue', alpha=alpha, label='Experience & Type')
+      ax[0].axvspan(5.5, 8.5, color='green', alpha=alpha, label='No Additional Info')
+      ax[0].axvspan(8.5, 11.5, color='orange', alpha=alpha, label='Type')
+  l = l
   for sc_i, (score_type_, experiment_scores) in enumerate(experiment_scores_dict.items()):
     plt.yticks(fontsize=tfs, fontweight='bold')
     x_axis = []
     h = []
     reverse = False if score_type_ == 'fuzzy_score' else True
     if sc_i == 1:
-      ax = ax.twinx()
-    y_label = 'Number of Mistakes' if score_type_ == 'n_mistakes' else 'Fuzzy Score'
+      if len(ax) == 1:
+        ax.append(ax[0].twinx())
+    y_label = {'n_mistakes':'Number of Mistakes',
+               'fuzzy_score':'Fuzzy Score',
+               'human_intervention':'Human Intervention'}[score_type_]
+    # bars_per_tick = len(all_exps) # reasoning vs no reasoning
+    bars_per_tick = 1
+    w = 0.5
+    shift = int(w*bars_per_tick + w*2)
+    z = (bars_per_tick)/2.0 - w
     if bar_plot:
-      bars_per_tick = len(all_exps) # reasoning vs no reasoning
-      w = 0.5
-      shift = int(w*bars_per_tick + w*2)
-      z = (bars_per_tick)/2.0 - w
-      if bar_plot:
-        for i in range(len(all_exps)):
-          x_axis.append(np.arange(len(experiment_scores[i])*shift, step=shift))
-          h.append(np.array(experiment_scores[i]))
+      for i in range(len(all_exps)):
+        x_axis.append(np.arange(len(experiment_scores[i])*shift, step=shift))
+        h.append(np.array(experiment_scores[i]))
       if score_type == 'fuzzy_score':
         bottom = np.mean(np.concatenate(h))
         bottom = np.round(bottom, 1)
-        ax.axhline(bottom, linestyle='--', color='k') # horizontal lines
-        yt = ax.get_yticks()
+        ax[sc_i].axhline(bottom, linestyle='--', color='k') # horizontal lines
+        yt = ax[sc_i].get_yticks()
         yt=np.append(yt,bottom)
-        ax.set_yticks(yt)
-        ax.set_yticklabels(yt)
+        ax[sc_i].set_yticks(yt)
+        ax[sc_i].set_yticklabels(yt)
       
       for i, (xi, hi) in enumerate(zip(x_axis, h)):
         plt.bar(xi - z*w + i*w, hi-bottom, w, bottom=bottom, label=fig_titles[i], color=color[i+sc_i])
         
       x_axis = x_axis[0]
-      ax.set_ylabel(f'{y_label}', fontsize=fs, fontweight='bold')
+      ax[sc_i].set_ylabel(f'{y_label}', fontsize=fs, fontweight='bold')
       if sc_i == 0:
-        ax.set_xticks(x_axis, x_ticks, rotation=rotation, fontsize=tfs, fontweight='bold')
+        ax[sc_i].set_xticks(x_axis, x_ticks, rotation=rotation, fontsize=tfs, fontweight='bold')
     else:
-      ax.set_ylabel(f"{y_label}",
+      ax[sc_i].set_ylabel(f"{y_label}",
             color=color[sc_i] if len(score_type) > 1 else 'black',
             fontsize=fs, fontweight='bold')
 
       for i in range(len(all_exps)):
+        exp_prefix = list(dict.fromkeys(map(lambda x: '_'.join(x.split('_')[:-1]), experiment_names[i])))
         x_order = np.arange(len(experiment_names[i]))
+        x_order = np.array(x_order)
+        y_order = np.arange(10)
+        # for exp_i, exp_name in enumerate(exp_prefix):
+        #   x1 = exp_i*n_test
+        #   x2 = x1 + n_test - 1
+        #   x_order[x1:x2+1] += exp_i
         y = np.array(experiment_scores[i])
         marker = 'o' if sc_i == 0 else 'x'
         linestyle = '-' if i % 2 == 0 else '--'
         if sc_i == 0 and i == 0:
-          ax.set_xticks(x_order, x_ticks, rotation=rotation, fontsize=tfs, fontweight='bold')
+          ax[sc_i].set_xticks(x_order[::1], x_ticks[::1], rotation=rotation, fontsize=tfs, fontweight='bold')
+          if len(score_type) > 1:
+            ax[sc_i].set_ylim([55, 95])
+        elif sc_i == 1 and i == 0:          
+          # ax[sc_i].set_yticks(y_order*0.3, fontsize=tfs, fontweight='bold')
+          ax[sc_i].set_ylim([0, 15])
         if test:
-          label = fig_titles[l]
+          label = fig_titles[i]
+          hi = None
           for exp_i, exp_name in enumerate(exp_prefix):
             x1 = exp_i*n_test
             x2 = x1 + n_test - 1
-            ax.plot(x_order[x1:x2+1], y[x1:x2+1], label=label, color=color[l], marker=marker, markersize=5, linewidth=2, linestyle=linestyle)
-            label = None
+            if score_type_ == 'human_intervention':
+              hi = y[x1:x2+1]
+              xi = np.array(x_order[x1:x2+1])
+              if 'values' not in bottom:
+                bottom['values'] = np.zeros_like(y)
+              ax[sc_i].bar(xi, hi, w, bottom=bottom['values'][x1:x2+1], color=color[l-2])
+              bottom[exp_name] = hi
+            else:
+              ax[sc_i].plot(x_order[x1:x2+1], y[x1:x2+1], label=label, color=color[l], marker=marker, markersize=5, linewidth=2, linestyle=linestyle)
+              label = None
+              plot_data.update({exp_name:y[x1:x2+1].tolist()})
         else:
-          ax.plot(x_order, y, label=fig_titles[l], color=color[l], marker=marker, markersize=5, linewidth=2, linestyle=linestyle)
+          ax[sc_i].plot(x_order, y, label=fig_titles[i], color=color[l], marker=marker, markersize=5, linewidth=2, linestyle=linestyle)
         l+=1
+        if score_type_ == 'human_intervention':
+          bottom['values'] += y
       if len(score_type) > 1:
         loc = (-0.03, 1.02) if sc_i == 0 else (0.81, 1.02)
       else:
         loc = (-0.03, 1.09)
-      ax.legend(fontsize=tfs, loc=loc, ncol=2)
-  plt.title(f"{title}", fontsize=fs, fontweight='bold')
-  # plt.legend(fontsize=tfs)
-  plt.grid()
-  figure = plt.gcf() # get current figure
-  figure.set_size_inches(15, 10)
-  if len(data_dir) > 1:
-    new_data_dir = ""
-    all_len = [len(d) for d in data_dir]
-    min_len = min(all_len)
-    for i, c in enumerate(data_dir[0]):
-      if i == min_len:
-        break
-      same_char = c == data_dir[1][i]
-      for ddir in data_dir[2:]:
-        same_char = same_char and c == ddir[i]
-      if same_char:
-        new_data_dir += c
-      else:
-        break
-  else:
-    new_data_dir = data_dir[0]
-  plt.savefig(os.path.join(new_data_dir,name),dpi=300,bbox_inches='tight')
-  plt.show()
+        # loc = (0.3, 1.03)
+      if sc_i == 0:
+        ax[sc_i].legend(fontsize=tfs, loc=loc, ncol=2)
+  return ax, title, name, plot_data, bottom
 
 if __name__ == '__main__':
   data_dir = []
@@ -440,7 +448,8 @@ if __name__ == '__main__':
   # input_type = 'description'
   # input_type = 'description_and_request'
   # score_type = ['n_mistakes', 'fuzzy_score']
-  score_type = 'fuzzy_score'
+  score_type = ['fuzzy_score', 'human_intervention']
+  # score_type = ['fuzzy_score']
   # score_type = 'n_mistakes'
   compare_by = ''
   compare_by = 'experience'
@@ -451,8 +460,119 @@ if __name__ == '__main__':
   none_of = []
   # none_of.append('experience')
   # none_of.append('reasoning')
-  none_of.append('from_request')
-  analyze_experiments(data_dir=data_dir, data_names=data_names, input_type=input_type, score_type=score_type,
+  # none_of.append('from_request')
+  all_plot_data = {}
+  ax, title, name, plot_data, human_intervention = analyze_experiments(data_dir=data_dir, data_names=data_names, input_type=input_type, score_type=score_type,
                       use_activities=False, compare_by=compare_by, must_have=must_have, none_of=none_of,
                       plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=None,
                       test=True, use_regions=True)
+  all_plot_data.update(plot_data)
+  compare_by = ''
+  compare_by = 'experience'
+  # compare_by = 'reasoning'
+  must_have = ['']
+  # must_have.append('reasoning')
+  # must_have.append('experience')
+  none_of = []
+  # none_of.append('experience')
+  none_of.append('reasoning')
+  # none_of.append('from_request')
+  ax, title, name, plot_data, human_intervention = analyze_experiments(data_dir=data_dir, data_names=data_names, input_type=input_type, score_type=score_type,
+                    use_activities=False, compare_by=compare_by, must_have=must_have, none_of=none_of,
+                    plot=True, bar_plot=False, sort_keys=False, sort_by='prompt_length', last_n_act=None,
+                    test=True, use_regions=True, ax=ax, l=2, bottom=human_intervention)
+  all_plot_data.update(plot_data)
+  
+  name_to_table_pos = {'from_description_and_request_use_experience_use_reasoning':(0,0),
+                     'from_description_and_request_use_experience_use_type_use_reasoning':(0,1),
+                     'from_description_use_experience_use_reasoning':(0,2),
+                     'from_description_use_experience_use_type_use_reasoning':(0,3),
+                     'from_request_use_experience_use_reasoning':(0,4),
+                     'from_request_use_experience_use_type_use_reasoning':(0,5),
+                     'from_description_and_request_use_experience':(1,0),
+                     'from_description_and_request_use_experience_use_type':(1,1),
+                     'from_description_use_experience':(1,2),
+                     'from_description_use_experience_use_type':(1,3),
+                     'from_request_use_experience':(1,4),
+                     'from_request_use_experience_use_type':(1,5),
+                     'from_description_and_request_use_reasoning':(2,0),
+                     'from_description_and_request_use_type_use_reasoning':(2,1),
+                     'from_description_use_reasoning':(2,2),
+                     'from_description_use_type_use_reasoning':(2,3),
+                     'from_request_use_reasoning':(2,4),
+                     'from_request_use_type_use_reasoning':(2,5),
+                     'from_description_and_request':(3,0),
+                     'from_description_and_request_use_type':(3,1),
+                     'from_description':(3,2),
+                     'from_description_use_type':(3,3),
+                     'from_request':(3,4),
+                     'from_request_use_type':(3,5)}
+  
+  mean_table = np.zeros((4,6))
+  std_table = np.zeros((4,6))
+  mean_hi_table = np.zeros((2,3))
+  std_hi_table = np.zeros((2,3))
+  for name, data in all_plot_data.items():      
+    table_pos = name_to_table_pos[name]
+    mean_table[table_pos] = np.mean(data)
+    std_table[table_pos] = np.std(data)
+    if 'type' in name and 'reasoning' in name:
+      table_pos  = (table_pos[0]//2,table_pos[1]//2)
+      if len(human_intervention) > 0:
+        mean_hi_table[table_pos] = np.mean(human_intervention[name])
+        std_hi_table[table_pos] = np.std(human_intervention[name])
+  mean_table = mean_table.round(2)
+  std_table = std_table.round(2)
+  mean_table = mean_table.tolist()
+  std_table = std_table.tolist()
+  data_to_print = [(mean_table,std_table)]
+  if len(human_intervention) > 0:
+    mean_hi_table = mean_hi_table.round(2)
+    std_hi_table = std_hi_table.round(2)
+    mean_hi_table = mean_hi_table.tolist()
+    std_hi_table = std_hi_table.tolist()
+    data_to_print.append((mean_hi_table,std_hi_table))
+
+  
+  for mtable, stable in data_to_print:
+    for i, (m_row, s_row) in enumerate(zip(mtable,stable)):
+      # print(f"{' & '.join([','.join([str(m),str(s)]) for m, s in zip(m_row, s_row)])} \\\\")
+      print(f"{' & '.join([' & '.join([str(m),str(s)]) for m, s in zip(m_row, s_row)])} & {np.mean(m_row).round(2)} & {np.mean(s_row).round(2)} \\\\")
+    mean = np.mean(mtable,axis=0).round(2)
+    mean_var = np.mean(stable,axis=0).round(2)
+    print(f"{' & '.join([' & '.join([str(m),str(s)]) for m, s in zip(mean, mean_var)])} \\\\")
+    flat_mean_table = np.array(mtable).flatten()
+    flat_std_table = np.array(stable).flatten()
+    print("top_3 = ", np.flip(np.sort(flat_mean_table))[:3])
+    print("top_3_std = ", np.sort(flat_std_table)[:3])
+    print("bottom_3 = ", np.sort(flat_mean_table)[:3])
+    print("bottom_3_std = ", np.flip(np.sort(flat_std_table))[:3])
+  
+  fs = 20
+  title = "Type Filtered Vs All Knowledge\nFixed Prompt Vs Augmented Prompt\nDescription Vs Request Vs Both together\nFact Correction & Reasoning Vs GPT Raw Output"
+  title = "Avg. Fuzzy Score & Human Intervention on a Test Set\n After Every New Activity Encountered in Train Set"#\n For Different System Configurations"
+  plt.title(f"{title}", fontsize=fs, fontweight='bold')
+  for axis in ax:
+    axis.grid()
+  # plt.grid(axis='both', which='major', color='black', linestyle='--', linewidth=0.5)
+  figure = plt.gcf() # get current figure
+  figure.set_size_inches(30, 10)
+  if len(data_dir) > 1:
+    new_data_dir = ""
+    all_len = [len(d) for d in data_dir]
+    min_len = min(all_len)
+    for i, c in enumerate(data_dir[0]):
+      if i == min_len:
+        break
+      same_char = c == data_dir[1][i]
+      for ddir in data_dir[2:]:
+        same_char = same_char and c == ddir[i]
+      if same_char:
+        new_data_dir += c
+      else:
+        break
+  else:
+    new_data_dir = data_dir[0]
+  name = "avg_fuzzy_score_on_test_set_for_all_configurations_after_each_train_example.png"
+  plt.savefig(os.path.join(new_data_dir,name),dpi=300,bbox_inches='tight')
+  plt.show()
